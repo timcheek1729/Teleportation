@@ -37,22 +37,13 @@ getApprox=(F, xi, i)->{
     
     ti=listOfPortals_i;
     use ring listF_0;
-    print listF;
     Fx=diff(x,listF_0);   --yes, standard form is diff(x,f) for differentiate f wrt x
     Ft=diff(t,listF_0);
-    print("start funcapprox");
-    print(xi);
-    print(ti);
-    print(Fx);
-    print(Ft);
     --yes, standard form is sub(F,{t=>2}), which works
     --also, need to do division in CC, otherwise get weird fraction field stuff
     
     if(sub(sub(Fx,{x=>xi,t=>ti}),CC)==0) then ( return xi+0*t;);
     g=xi-sub(sub(Ft,{x=>xi,t=>ti}),CC)/sub(sub(Fx,{x=>xi,t=>ti}),CC)*(t-ti); 
-    
-    print(g);
-    print("end funcapprox");
     
     return g;
 
@@ -68,25 +59,19 @@ getApprox=(F, xi, i)->{
 
 inRGA=(F, fti, j)-> {
     tj=listOfPortals_j;
-    --print(fti);
-    --print tj;
     specF=specializeSystem(point{{tj}}, F);
-    --print(specF);
     
     --EVENTUALLY NEEDS CHANGING TO BE A POLYSYSTEM
-    --print fti;
     initGuess=sub(fti,{t=>tj});
-    --print initGuess;
     xj=point{{initGuess}};
     
     try(
         
         for i from 1 to 10 do (
             xj=newton(polySystem(specF),xj);
-            --if ((abs(abs(sub(initGuess,CC))-abs(sub(xj.Coordinates_0,CC))))) >= epsilon then return (false,1);
+            if ((abs(abs(sub(initGuess,CC))-abs(sub(xj.Coordinates_0,CC))))) >= epsilon then return (false,1);
         
         );
-        --print(xj.Coordinates);
     ) then (
     
         if ((abs(abs(sub(initGuess,CC))-abs(sub(xj.Coordinates_0,CC))))) < epsilon then (
@@ -161,17 +146,13 @@ parametrizeFamily=(F, p0, p1)->{
 --E: performs dfs on directed graph (that it creates) until all avenues have been exhasted, or until stoppingCrit met
 
 iterateOnce=(F, xi, i)->{
+    --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
+    --otherwise M2 overwrites g upon each recursive step
     g:=getApprox(F, xi,i);
     
-    --print(g);
-    --print(xi);
-    --print(Pi);
     for j from 0 to #listOfPortals-1 do (
         if j!=i then ( --so are looking at different portals
-            print(i, j, g);
             potentialZero=inRGA(F, g, j);
-            
-            --print(potentialZero);
             
             if potentialZero_0 and not(stoppingCrit()) then (
             
@@ -202,7 +183,6 @@ solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
         );
     
         parametrizedF=parametrizeFamily(F, t0, multiparamPortals);
-        
         --only the "base" system will remain fixed by the straight line "homotopy" after each iteration
         --thus, we clear out all other portals, but keep the first portal
         for i from 1 to #listOfPortals-1 do (
@@ -216,21 +196,17 @@ solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
 
 };
 
-V=CC[x];       --the solution space
-P=CC[p];       --the parameter space
-R=P[x];
-use R;
 
 roundTo=2;
-epsilon=0.5;
+epsilon=0.2;
 
 l={0};
 --for i from 1 to 50 do (
 --    l=append(l, random(-4,4)*random(CC));
 --);
 
-
-f=(x^3-3*x-p)_R;
+R=CC[p][x];
+f=(x^3-3*x-p);
 x0={0};
 t0={0};
 --listOfPortals={0, 0.5+0.5*ii, 1+ii, 1.5+1.5*ii};
@@ -241,6 +217,7 @@ t0={0};
 listOfPortals={1, 3, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3+0.5*ii, 3.5,  3-0.5*ii, 3-ii, 2.5-ii, 2-ii, 1.5-ii, 1-ii, 0.5-ii, -ii, 0.5};
 
 mo=solveAll(polySystem{f}, x0,t0,listOfPortals, {{1}});
+print peek portals;
 
 
 
