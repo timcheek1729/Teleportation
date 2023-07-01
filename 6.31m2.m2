@@ -1,5 +1,10 @@
 --works for multivariate, multiparameter systems of functions
 --has assertion check to ensure seed solution pair is correct
+--does forward error check as well, although prob not needed
+--no longer does gamma trick, b/c messes up intermediate line/planar systems
+  --actually, sols don't need to be conjugates b/c deal w/ complex functions
+  --may introduce gamma trick later
+--debugged, and now works for systems
 installPackage "NumericalAlgebraicGeometry";
 installPackage "MonodromySolver";
 
@@ -15,41 +20,46 @@ random Type := o -> R -> (
     else (old'random'Type o) R
     ) 
 
---rounds complex number to n decimal places
+--rounds list of complex numbers to n decimal places
 --used for storing approx zeroes/params in hashtable w/o unnecessary overlap
 rounds=method();
-rounds(ZZ,CC):=(n,c)->{
-    a=realPart(c);
-    b=imaginaryPart(c);
-    a=sub(a,RR);
-    b=sub(b,RR);
-    return round(n, a)+round(n, b)*ii;
+rounds:=(n,listL)->{
+    r={};
+    for num in listL do(
+        a=realPart(num);
+        b=imaginaryPart(num);
+        a=sub(a,RR);
+        b=sub(b,RR);
+        r=append(r, round(n, a)+round(n, b)*ii);
+    );
+    
+    return r;
 };
 
 --R: a portal CC ti=listPortals_i and a solution (list) xi to the system F_xi, F a polySystem
+    --orderDeg is the order of the approximation, and e is how far to sample
 --M: none
 --E: returns a function g(t) that approximates F near (xi,ti)
 --NEEDS EDITS: take in epsilon or be global variable, also need to be able to change order of approximation
 
-getApprox=(inputSystem, xi, i)->{
+getApprox=(inputSystem, xi, i, orderDeg, e)->{
     root=point{xi};
     --SHOULD BELOW BE i OR NOT. DO NOT THINK SO, think is good
     seed = (listOfPortals_i)_CC;
     
-    epsilon = 0.2;
     numVar = inputSystem.NumberOfPolys;
 
     ParamSystem = new MutableList;
     generatedParam = new MutableList;
     generatedRoots = new MutableList;
 
-    for i from 0 to numVar-1 do {
-        newParam = seed + epsilon*exp(2*pi*ii*i/numVar);
+    for i from 0 to orderDeg-1 do {
+        newParam = seed + e*exp(2*pi*ii*i/orderDeg);
         generatedParam = append(generatedParam,newParam);
         ParamSystem = append(ParamSystem, polySystem(specializeSystem(point {{newParam}}, inputSystem)));
      };
 
-    for i from 0 to numVar-1 do {
+    for i from 0 to orderDeg-1 do {
         generatedRoots = append(generatedRoots,newton(ParamSystem#i,root));
     };
 
@@ -59,9 +69,9 @@ getApprox=(inputSystem, xi, i)->{
     -- "coordinates point" convert a point into list
 
     lagBasis = new MutableList;
-    for i from 0 to numVar do {
+    for i from 0 to orderDeg do {
         comp = 1;
-        for j from 0 to numVar do {
+        for j from 0 to orderDeg do {
             if i != j then {
                 comp = comp * (t-generatedParam#j)/(generatedParam#i-generatedParam#j);
             }
@@ -71,11 +81,11 @@ getApprox=(inputSystem, xi, i)->{
 
     lagBasis = matrix(vector toList lagBasis);
 
-    L = for i from 0 to numVar-1 list for i from 0 to numVar list 1+ii;
+    L = for i from 0 to numVar-1 list for i from 0 to orderDeg list 1+ii;
     M = mutableMatrix L;
 
     for i from 0 to numVar-1 do {
-        for j from 0 to numVar do {
+        for j from 0 to orderDeg do {
             M_(i,j) = (coordinates (generatedRoots#j))_i;
         };
     };
@@ -87,6 +97,7 @@ getApprox=(inputSystem, xi, i)->{
     return interpolatedSys;
 
 };
+
 --R: to lists of complex numbers
 --M: none
 --E: returns norm of their difference
@@ -127,20 +138,19 @@ inRGA=(F, fti, j)-> {
     
     initGuess=flatten(toList(entries(evaluate(fti,point{{tj}}))));
     xj=point{initGuess};
-    
-    --try(
+    try(
         
         for i from 1 to 10 do (
             xj=newton(polySystem(specF),xj);
             if getNorm(initGuess, xj.Coordinates) >= epsilon then ( return (false,1););
         
         );
-    --) then (
-    
-        if getNorm(initGuess, xj.Coordinates) < epsilon then (
+    ) then (
+        fwdError=getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj}}, F)), xj)))));
+        --print fwdError;
+        if (getNorm(initGuess, xj.Coordinates) < epsilon) and (fwdError<epsilon) then (
         
-            newSol={rounds(roundTo,(xj.Coordinates_0)_CC)};
-            
+            newSol=rounds(roundTo,xj.Coordinates);
             if member(newSol, portals#j) then ( return (false, -1) ) else (
                 portals#j=portals#j +set{newSol}; --adds xi solution to ti
                 return (true, newSol);
@@ -154,10 +164,10 @@ inRGA=(F, fti, j)-> {
         );
         
         
-    --) else (
+    ) else (
         
-    --    return (false,0);
-    --);
+        return (false,0);
+    );
 };
 
 --R:
@@ -192,7 +202,7 @@ parametrizeFamily=(F, p0, p1)->{
     for gen in gens(everythingRing) do (
         if count< #listOfParams then (
             for k from 0 to #newPolyList-1 do (
-                newPolyList#k = sub(newPolyList#k, {gen => (t)*(p0_k)+(1-t)*(p1_k)});
+                newPolyList#k = sub(newPolyList#k, {gen => (t)*(p0_count)+(1-t)*(p1_count)});
             
             );
              count=count+1;
@@ -212,7 +222,7 @@ parametrizeFamily=(F, p0, p1)->{
 iterateOnce=(F, xi, i)->{
     --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
     --otherwise M2 overwrites g upon each recursive step
-    g:=getApprox(F, xi,i);
+    g:=getApprox(F, xi,i, 1, 0.2);
     
     for j from 0 to #listOfPortals-1 do (
         if j!=i then ( --so are looking at different portals
@@ -239,7 +249,7 @@ iterateOnce=(F, xi, i)->{
 
 solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
     --makes sure that the seed solutions pair is indeed legitimate
-    assert (getNorm2(flatten(toList(entries(evaluate(polySystem(evaluate(F, point{x0})), point{t0})))))<epsilon);
+    assert (getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{t0}, F)), point{x0})))))<epsilon);
 
     portals#0=set {};
     
@@ -261,28 +271,76 @@ solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
 
 };
 
-
 roundTo=2;
-epsilon=1;
+
+epsilon=0.5;
+
 
 l={1};
+
 for i from 1 to 50 do (
+
     l=append(l, random(-4,4)*random(CC));
+
 );
 
+
+
+
 R=CC[p][x];
+
 f=(x^3-3*x-p);
+
 x0={0};
+
 t0={0};
+
+
 --listOfPortals={0, 0.5+0.5*ii, 1+ii, 1.5+1.5*ii};
+
+
+
+
 --listOfPortals=l;
+
+
+
+
 --listOfPortals={1, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3+0.5*ii, 3, 3.5,  3-0.5*ii, 3-ii, 2.5-ii, 2-ii, 1.5-ii, 1-ii, 0.5-ii, -ii, 0.5};
+
+
+
+
 --listOfPortals={1, 0};
+
+
+
+
+
+
+
+
+
 
 listOfPortals={1, 3, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3+0.5*ii, 3.5,  3-0.5*ii, 3-ii, 2.5-ii, 2-ii, 1.5-ii, 1-ii, 0.5-ii, -ii, 0.5};
 
+
+
+
+
+
+
+
+
+
 mo=solveAll(polySystem{f}, x0,t0,listOfPortals, {{10*ii}});
+
+
+
+
 print peek portals;
+
+
 
 
 
