@@ -1,4 +1,5 @@
-
+--works for multivariate, multiparameter systems of functions
+--has assertion check to ensure seed solution pair is correct
 installPackage "NumericalAlgebraicGeometry";
 installPackage "MonodromySolver";
 
@@ -93,6 +94,18 @@ getApprox=(inputSystem, xi, i)->{
 getNorm=(list1, list2)->{
     s=0;
     for x in (list1-list2) do (
+        s=s+realPart(x)^2+imaginaryPart(x)^2;
+    );
+    return sqrt(s);
+    
+
+};
+
+
+--apparently overloaded functions are not a thing in Macualay2
+getNorm2=(list1)->{
+    s=0;
+    for x in (list1) do (
         s=s+realPart(x)^2+imaginaryPart(x)^2;
     );
     return sqrt(s);
@@ -225,6 +238,8 @@ iterateOnce=(F, xi, i)->{
 --E: returns a list of sols (lists) that satisfy F(sols, t0)=0
 
 solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
+    --makes sure that the seed solutions pair is indeed legitimate
+    assert (getNorm2(flatten(toList(entries(evaluate(polySystem(evaluate(F, point{x0})), point{t0})))))<epsilon);
 
     portals#0=set {};
     
@@ -268,7 +283,6 @@ listOfPortals={1, 3, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3
 
 mo=solveAll(polySystem{f}, x0,t0,listOfPortals, {{10*ii}});
 print peek portals;
-
 
 
 
