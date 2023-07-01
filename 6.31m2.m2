@@ -272,76 +272,26 @@ solveAll=(F, x0, t0, listOfPortals, megaPortals)->{
 };
 
 roundTo=2;
-
 epsilon=0.5;
 
-
 l={1};
-
 for i from 1 to 50 do (
-
     l=append(l, random(-4,4)*random(CC));
-
 );
 
 
-
-
 R=CC[p][x];
-
 f=(x^3-3*x-p);
-
 x0={0};
-
 t0={0};
 
-
 --listOfPortals={0, 0.5+0.5*ii, 1+ii, 1.5+1.5*ii};
-
-
-
-
 --listOfPortals=l;
-
-
-
-
 --listOfPortals={1, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3+0.5*ii, 3, 3.5,  3-0.5*ii, 3-ii, 2.5-ii, 2-ii, 1.5-ii, 1-ii, 0.5-ii, -ii, 0.5};
-
-
-
-
 --listOfPortals={1, 0};
-
-
-
-
-
-
-
-
-
-
 listOfPortals={1, 3, 0.5*ii, 1*ii, 0.5+1*ii, 1+ii, 1.5+ii, 2+ii, 2.5+ii, 3+ii, 3+0.5*ii, 3.5,  3-0.5*ii, 3-ii, 2.5-ii, 2-ii, 1.5-ii, 1-ii, 0.5-ii, -ii, 0.5};
-
-
-
-
-
-
-
-
-
-
 mo=solveAll(polySystem{f}, x0,t0,listOfPortals, {{10*ii}});
-
-
-
-
 print peek portals;
-
-
-
 
 
 
