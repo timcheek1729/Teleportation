@@ -428,18 +428,18 @@ epsilon=0.2; --main function is to how far away zeroGuesses and trueZeroes can b
 fwdErrB=0.2; --determines max fwdErr
 orderDeg=1; --determines the order of the funciton approximation
 e=0.2; --how far away from seed to sample points in funcApprox
-numMini=20; --number of points to be in complex line rga case
-numMega=4; --number of multiparameter points to sample from
-onDisk=false;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
+numMini=40; --number of points to be in complex line rga case
+numMega=6; --number of multiparameter points to sample from
+onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
 
 numHoms=1; --number of straight-line "homotopies" to do between p0 and fixed p1
     --is useless now, b/c gamma trick is not applicable
     
-   R=CC[p][x,y]
-   inputSystem = {x^2+y^2-p,x^3-y^2+x};
-root = point {{0.544,0.839_CC}};
-seed =1;
-mo=solveAll(polySystem(inputSystem), {0.544,0.839_CC}, {seed});
+   R=CC[a,b,c,d][x,y]
+   inputSystem = {a*x+b*y, c*x*y+d};
+root = {ii_CC, -1*ii_CC};
+seed ={1,1,1,-1};
+mo=solveAll(polySystem(inputSystem), root, seed);
 print peek megaSols;
 
