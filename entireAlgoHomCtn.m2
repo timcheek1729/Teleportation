@@ -407,9 +407,10 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
     --so moving left to right
     if curT<goalT then (
         while getNorm({curT},{goalT})>0.01 do (
-            pades:=getApprox(F, xi,i, tableLOP_(indexP_0)_(indexP_1));
+            pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
             minD:=B1*rad;
+            print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, min(curT+minD, goalT))};
             curT=min(curT+minD, goalT);
@@ -422,9 +423,10 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
     --so moving right to left
     ) else (
         while getNorm({curT},{goalT})>0.01 do (
-            pades:=getApprox(F, xi,i, tableLOP_(indexP_0)_(indexP_1));
+            pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
             minD:=B1*rad;
+            print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, max(curT-minD, goalT))};
             curT=max(curT-minD, goalT);
@@ -620,7 +622,7 @@ parametrizations=table;
 doReturn=false;
 
 verbose=true;
-numNewton=5; --max number of times to runs Newtons for
+numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.2; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.2; --determines max fwdErr
@@ -630,7 +632,7 @@ numMini=40; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
 onDisk=false;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
-numGauss=1; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
+numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
 L=5; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0.5; --lower bound scalar for jump zone annulus
@@ -684,6 +686,5 @@ polys = parametrizedCyclic 3;
 
 mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 print peek megaSols;
-
 
 
