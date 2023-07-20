@@ -140,12 +140,12 @@ getEuclideanD= (point1, point2) -> {
 rangeQuery = (bboxMin, bboxMax) -> {
     result = set{};
 
-    -- Helper function to check if a region intersects with the bounding box
+    --check if a region intersects with the bounding box
     intersects = (xmin, xmax, ymin, ymax) -> {
         return (xmin <= bboxMax#0 and xmax >= bboxMin#0 and ymin <= bboxMax#1 and ymax >= bboxMin#1);
     };
 
-    -- Helper function to recursively search the quadtree regions
+    --recursively search the quadtree regions
     rangeQueryHelper = (index) -> {
         (xmin, xmax, ymin, ymax, children, points) = toSequence(quadtree#index);
 
@@ -157,21 +157,20 @@ rangeQuery = (bboxMin, bboxMax) -> {
                 );
             );
 
-            -- Recursively search the children regions
+            --recursively search the children regions
             for childIndex in children do (
                 rangeQueryHelper(childIndex);
             );
         );
     };
 
-    -- Start the range query from the root node
+    --start the range query from the root node
     rangeQueryHelper(0);
 
     return result;
 };
 
 numCapacity=2;
--- Example usage: Create a quadtree outline with numCapacity 2 from a list of points
 points = {{0.2, 0.3}, {0.4, 0.6}, {-0.9, -0.4}};
 createQuadtreeFromPoints(points, -1,1,-1,1);
 printQuadtree(0);
