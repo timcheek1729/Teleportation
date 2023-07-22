@@ -9,6 +9,7 @@
 --working on ensuring each edge indeed "tracks" all the way
 --now does [L/M] Pade approximation, but does not yet take into account radius of convergence or error estimate
 --cut dfs off, i.e., can only ever jump once for a given (sol, t0) pair
+--homotopy continuation all the way, using Pade (and yes, only tracks new solutions)
 
 needsPackage "NumericalAlgebraicGeometry";
 needsPackage "MonodromySolver";
@@ -246,7 +247,6 @@ getNorm=(list1, list2)->{
     );
     return sqrt(s);
     
-
 };
 
 
@@ -286,74 +286,6 @@ getD=(pade)->{
 
     return minD;
 };
-
---R: a function fti approximating around xi0, ti0; and a new parameter value tj=listOfPortals_j; polySystem F
-   --ti is a CC, xi is a list
-   --index=(a,b) such that listOfPortals=tableLOP_a_b, and (tableSols_(index_0)_(index_1))=portals
---M: if f approximates F_tj well, then appends Q_tj with new solution to F_tj 
---E: returns (bool, CC) pair.
-    --if f does approximates F_tj well and finds a newSolution, then returns (true, newSolution)
-    --otherwise false, with an integer indicator for whether newton errors, f a bad approx, or sol already known
---note: indeed checks how far xj is from initGuess as you keep doing Newton's, and also checks fwdError at end
-
-inRGA=(F, fti, i0, j, indexP)-> {
-    tj=((tableLOP_(indexP_0)_(indexP_1))_j)_CC;
-    ti=((tableLOP_(indexP_0)_(indexP_1))_i0)_CC;
-    specF=specializeSystem(point{{tj}}, F);
-    
-    --initGuess=flatten(toList(entries(evaluate(fti,point{{tj}}))));
-    initGuess=evaluateAt(fti, ti, tj);
-    xj=point{initGuess};
-    try(
-        
-        for i from 1 to numNewton do (
-            xj=newton(polySystem(specF),xj);
-            if getNorm(initGuess, xj.Coordinates) >= epsilon then (print("fail1"); return (false,1););
-        
-        );
-    ) then (
-        fwdError=getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj}}, F)), xj)))));
-        --print fwdError;
-        if (getNorm(initGuess, xj.Coordinates) < epsilon) and (fwdError<fwdErrB) then (
-        
-            newSol=rounds(roundTo,xj.Coordinates);
-            if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1) ) else (
-                (tableSols_(indexP_0)_(indexP_1))#j=(tableSols_(indexP_0)_(indexP_1))#j +set{newSol}; --adds xi solution to ti
-                return (true, newSol);
-            
-            );
-        
-            
-            
-        ) else (
-            print("fail2");
-            return (false, 1);
-        );
-        
-        
-    ) else (
-        return (false,0);
-    );
-};
-
---R: j is an index of the current miniportal, i is the index of the end portal within the edge
---M:
---E: a placeholder function for stopping criterion
---note: VERY MUCH NEEDS EDITING
-
-stoppingCrit=(j,i)->{
-    if (stopEarly) then (
-          if (j==i) then(
-              print("INDEED REACHED THE END PORTAL");
-              doReturn=true;
-         );
-          return (j==i);
-    ) else (
-         return false;
-    );
-    
-};
-
 --R: a polySystem F in \C[\vec{p}][\vec{x}], with start portal p0 and target portals p1, both lists
 --M: none
 --E: returns a polySystem in \C[t][\vec{x}], paameterized at t*p0+(1-t)*p1
@@ -410,7 +342,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
             pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
             minD:=B1*rad;
-            print(curT, minD);
+            --print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, min(curT+minD, goalT))};
             curT=min(curT+minD, goalT);
@@ -426,7 +358,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
             pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
             minD:=B1*rad;
-            print(curT, minD);
+            --print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, max(curT-minD, goalT))};
             curT=max(curT-minD, goalT);
@@ -440,6 +372,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
     
     newSol=rounds(roundTo,curX.Coordinates);
     (tableSols_(indexP_0)_(indexP_1))#endIndex=(tableSols_(indexP_0)_(indexP_1))#endIndex +set{newSol};
+    return newSol;
 };
 
 --R: m to be the dimension of the (multi)parameter space, m>0
@@ -459,7 +392,7 @@ getRandomMegaPortal=(m)->{
    --also include 0, b/c H(0)=p1, the other system we care about
 --note: now have disk/circle of DIAMETER 1, as is should be
 getRandomListOfPortals=(n)->{
-    assert (n>=3);
+    assert (n>=2);
     lop={1, 0};
     if (onDisk) then (
            for i from 3 to n do lop=append(lop, 0.5+0.5*sqrt(random(RR))*exp(2*pi*ii*random(RR)));
@@ -483,8 +416,6 @@ initializeDataStructs=(F, x0, t0)->{
         megaLOP=append(megaLOP, getRandomMegaPortal(#t0));
     );
     --if using cutom, predeterminted megaLOP for debugging, PUT IT HERE (below)
-    --megaLOP={{1,1,1,-1},{.553851-.832616*ii,.828352-.560208*ii,.993669+.112352*ii,.826524-.562901*ii},{-.502218+.864741*ii,-.211138+.977456*ii,.552437+.833555*ii,-.707497-.706716*ii},{-.998407+.0564249*ii,-.959298+.282396*ii,-.481673+.876351*ii,.904023-.427483*ii}};
-
 
     megaSols#0=set{rounds(roundTo,x0)};
     for i from 1 to numMega-1 do (
@@ -524,6 +455,33 @@ initializeDataStructs=(F, x0, t0)->{
     );
     
     
+    solsNotTracked=table(numMega, numMega, (i,j)->
+        (if i<j or j<i then (
+            if i==0 then return set{rounds(roundTo,x0)} else return set{};
+        
+        ) else (
+            return 0;
+        );)
+    );
+
+    --to make it mutable
+    solsNotTracked=new MutableList from solsNotTracked;
+    for k from 0 to numMega-1 do solsNotTracked#k=new MutableList from solsNotTracked#k;
+    
+    
+     solsTracked=table(numMega, numMega, (i,j)->
+        (if i<j or j<i then (
+            return set{};
+        
+        ) else (
+            return 0;
+        );)
+    );
+
+    --to make it mutable
+    solsTracked=new MutableList from solsTracked;
+    for k from 0 to numMega-1 do solsTracked#k=new MutableList from solsTracked#k;  
+    
     parametrizations=table(numMega, numMega, (i,j)->
         (if i<j then (
             return parametrizeFamily(F, megaLOP_i, megaLOP_j);
@@ -545,6 +503,7 @@ initializeDataStructs=(F, x0, t0)->{
 --E: runs search algorithm (DFS search) on megaPortals
 
 searchOuter=(F, i)->{
+    
     for j from 0 to numMega-1 do(
         if i!=j then (
         
@@ -566,13 +525,32 @@ searchOuter=(F, i)->{
             if (i==min(i,j)) then endIndex=1 else endIndex=0;
             
             
-            --runs edge algorithm on each solution to F_(portal_i)
-            partialSols=toList(megaSols#i);
+            --runs edge algorithm on each solution to F_(portal_i) that hasn't been tracked yet
+            partialSols=toList(solsNotTracked#i#j);
+            if verbose then print ("will be tracking ",toList(solsNotTracked#i#j));
+            
             for x0 in partialSols do (
+                --for x in solsNotTracked do print peek x;
+
+
+                if verbose then print("Tracking ", x0, "from", megaLOP_i, "to", megaLOP_j);
+            
                 doReturn=false;
-                if i==min(i,j) then (iterateOnce(parametrizedF, x0, 0, (min(i,j),max(i,j)), endIndex);
-                ) else (iterateOnce(parametrizedF, x0, 1, (min(i,j),max(i,j)), endIndex););
+                newSol;
+                if i==min(i,j) then (newSol=iterateOnce(parametrizedF, x0, 0, (min(i,j),max(i,j)), endIndex);
+                ) else (newSol=iterateOnce(parametrizedF, x0, 1, (min(i,j),max(i,j)), endIndex););
                 
+                --x0 has now been tracked from ti to tj, so can remove from not tracked
+                solsNotTracked#i#j=solsNotTracked#i#j -set{x0};
+                solsTracked#i#j=solsTracked#i#j+set{x0};
+                
+                --if newSol hasn't been tracked before, then add it to be tracked
+                for edges from 0 to numMega-1 do(
+                    if j!=edges and newSol!={} and not(member(newSol, solsTracked#j#edges)) then solsNotTracked#j#edges =solsNotTracked#j#edges +set{newSol};
+                );
+            
+                --for x in solsNotTracked do print peek x;
+
             );
             
             prevCount:=#(megaSols#j);
@@ -619,24 +597,26 @@ tableSols=table;
 megaLOP={};
 megaSols=new MutableHashTable;
 parametrizations=table;
+solsNotTracked;
+solsTracked;
 doReturn=false;
 
 verbose=true;
-numNewton=3; --max number of times to runs Newtons for
+numNewton=5; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.2; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.2; --determines max fwdErr
 orderDeg=1; --determines the order of the funciton approximation
 e=0.2; --how far away from seed to sample points in funcApprox
-numMini=40; --number of points to be in complex line rga case
+numMini=2; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
-onDisk=false;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
+onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
-numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
-L=5; --order of numerator in Pade
+numGauss=1; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
+L=2; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0.5; --lower bound scalar for jump zone annulus
-B2=1; --uper bound scalar for jump zone annulus
+B2=1.2; --uper bound scalar for jump zone annulus
 
 numHoms=0; --number of straight-line "homotopies" to do between p0 and fixed p1
     --is useless now, b/c gamma trick is not applicable
@@ -688,3 +668,4 @@ mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1
 print peek megaSols;
 
 
+mega
