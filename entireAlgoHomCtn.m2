@@ -669,3 +669,13 @@ print peek megaSols;
 
 
 mega
+
+-*
+needsPackage "PHCpack";
+print track(specializeSystem(point{{1,1,1,1,1,1,1,-1}}, polys), specializeSystem(point{{0.1,0.1,0.1,0.1,0.1,0.1,0.1,-0.1}}, polys), {(1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3)))});
+
+
+-*
+
+
+
