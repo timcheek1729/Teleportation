@@ -13,6 +13,7 @@
 --finally actually only track solutions that haven't been tracked yet
 --now if can't jump all the way to the end (not enough portals), just straight line homotopy to the destination
 --tree is not yet implemented
+--cyclic 3 roots now takes only around 20 seconds to run
 
 
 needsPackage "NumericalAlgebraicGeometry";
@@ -353,9 +354,9 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
     --otherwise M2 overwrites g upon each recursive step
     
     pades:=getApprox(F, xi,i, tableLOP_(indexP_0)_(indexP_1));
-    --rad:=getD(pades);
-    --minD:=B1*rad;
-    --maxD:=B2*rad;
+    rad:=getD(pades);
+    minD:=B1*rad;
+    maxD:=B2*rad;
     
     distanceToEnd=getNorm({(tableLOP_(indexP_0)_(indexP_1))_i}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex});
     
@@ -364,8 +365,9 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         distanceBetween=getNorm({(tableLOP_(indexP_0)_(indexP_1))_i}, {(tableLOP_(indexP_0)_(indexP_1))_j});
         
         --so are looking at different portals and want to continue
-        --if j!=i and not(doReturn) and not(stoppingCrit(i, endIndex)) and minD<distanceBetween and distanceBetween<maxD then ( 
-        if j!=i and not(doReturn) and not(stoppingCrit(i, endIndex)) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd then (
+        --if j!=i and not(doReturn) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and minD<distanceBetween and distanceBetween<maxD then ( 
+        --if j!=i and not(doReturn) and not(stoppingCrit(i, endIndex)) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd then (
+        if j!=i and not(doReturn) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and distanceBetween<getD(pades) then (
             potentialZero:=inRGA(F, pades, i, j, indexP);
             
              --JUST DEBUGGING STUFF, DELETE LATER
@@ -380,6 +382,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
             if potentialZero_0 then (
                 --if reached then end, return the new zero that was found
                 if j==endIndex then (print("INDEED REACHED END PORTAL"); return potentialZero_1) ;
+            
+                --print(getD(pades), distanceBetween);
             
                 --if found newSol and should keep going, then calls on new solution pair
                 moved:=true;
@@ -410,7 +414,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
         while getNorm({curT},{goalT})>0.01 do (
             pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
-            minD:=B1*rad;
+            minD:=B3*rad;
             --print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, min(curT+minD, goalT))};
@@ -426,7 +430,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
         while getNorm({curT},{goalT})>0.01 do (
             pades:=getApprox(F, curX.Coordinates,0, {curT});
             rad:=getD(pades);
-            minD:=B1*rad;
+            minD:=B3*rad;
             --print(curT, minD);
         
             curX=point{evaluateAt(pades, curT, max(curT-minD, goalT))};
@@ -709,19 +713,20 @@ doReturn=false;
 verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
-epsilon=0.2; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
+epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.2; --determines max fwdErr
 orderDeg=1; --determines the order of the funciton approximation
 e=0.2; --how far away from seed to sample points in funcApprox
-numMini=60; --number of points to be in complex line rga case
+numMini=500; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
 onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
 numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
 L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
-B1=0.7; --lower bound scalar for jump zone annulus
+B1=0.5; --lower bound scalar for jump zone annulus
 B2=1.2; --uper bound scalar for jump zone annulus
+B3=0.7;--jump size in hom ctn
 
 numHoms=0; --number of straight-line "homotopies" to do between p0 and fixed p1
     --is useless now, b/c gamma trick is not applicable
@@ -781,4 +786,3 @@ needsPackage "PHCpack";
 print time track(specializeSystem(point{{1,1,1,1,1,1,1,-1}}, polys), specializeSystem(point{{0.1,0.1,0.1,0.1,0.1,0.1,0.1,-0.1}}, polys), {(1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3)))});
 
 *-
-
