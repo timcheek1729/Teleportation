@@ -391,7 +391,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         
         );
     );
-    if not moved then return homCtn(F, xi, i, indexP, endIndex);
+    if not moved then time return homCtn(F, xi, i, indexP, endIndex);
 };
 
 --homotopy continuation add on:
@@ -642,8 +642,8 @@ searchOuter=(F, i)->{
             
                 doReturn=false;
                 newSol;
-                if i==min(i,j) then (newSol=iterateOnce(parametrizedF, x0, 0, (min(i,j),max(i,j)), endIndex);
-                ) else (newSol=iterateOnce(parametrizedF, x0, 1, (min(i,j),max(i,j)), endIndex););
+                if i==min(i,j) then (newSol=time iterateOnce(parametrizedF, x0, 0, (min(i,j),max(i,j)), endIndex);
+                ) else (newSol=time iterateOnce(parametrizedF, x0, 1, (min(i,j),max(i,j)), endIndex););
                 
                 --x0 has now been tracked from ti to tj, so can remove from not tracked
                 solsNotTracked#i#j=solsNotTracked#i#j -set{x0};
@@ -706,8 +706,8 @@ solsNotTracked;
 solsTracked;
 doReturn=false;
 
-verbose=true;
-numNewton=5; --max number of times to runs Newtons for
+verbose=false;
+numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.2; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.2; --determines max fwdErr
@@ -717,10 +717,10 @@ numMini=60; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
 onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
-numGauss=1; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
-L=2; --order of numerator in Pade
+numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
+L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
-B1=0.5; --lower bound scalar for jump zone annulus
+B1=0.7; --lower bound scalar for jump zone annulus
 B2=1.2; --uper bound scalar for jump zone annulus
 
 numHoms=0; --number of straight-line "homotopies" to do between p0 and fixed p1
@@ -761,7 +761,7 @@ parametrizedCyclic = n -> (
 
 polys = parametrizedCyclic 3;
 
-mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 print peek megaSols;
 
 
@@ -776,6 +776,9 @@ print peek megaSols;
 
 *-
 
+-*
+needsPackage "PHCpack";
+print time track(specializeSystem(point{{1,1,1,1,1,1,1,-1}}, polys), specializeSystem(point{{0.1,0.1,0.1,0.1,0.1,0.1,0.1,-0.1}}, polys), {(1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3)))});
 
-
+*-
 
