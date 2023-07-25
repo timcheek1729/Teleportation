@@ -10,7 +10,7 @@
     --(still move toward enpoint by only considering jumping to points that decrease distance to endpoint
 --finally actually only track solutions that haven't been tracked yet
 --now if can't jump all the way to the end (not enough portals), just straight line homotopy to the destination
---tree is not yet implemented (and won't be, is too much prepocessing)
+--tree is not yet implemented (and won't be, is too much prepocessing)(now prune list we check each jump)
 --cyclic 3 roots now takes only around 20 seconds to run
 --if a point "fails" (i.e., can't jump forward from it), is thrown out (speeds up later path trackings over same line reduction)
 
@@ -314,7 +314,10 @@ inRGA=(F, fti, i0, j, indexP)-> {
         
         for i from 1 to numNewton do (
             xj=newton(polySystem(specF),xj);
-            if getNorm(initGuess, xj.Coordinates) >= epsilon then (print("jump failed--newton bounced"); return (false,1););
+            if getNorm(initGuess, xj.Coordinates) >= epsilon then (
+                --print("jump failed--newton bounced");
+                return (false,1);
+            );
         
         );
     ) then (
@@ -350,59 +353,79 @@ inRGA=(F, fti, i0, j, indexP)-> {
 --NOTE: indeed checks how far one could jump in theory
 
 iterateOnce=(F, xi, i, indexP, endIndex)->{
-    --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
-    --otherwise M2 overwrites g upon each recursive step
-    
-    pades:=getApprox(F, xi,i, tableLOP#(indexP_0)#(indexP_1));
-    rad:=getD(pades);
-    minD:=B1*rad;
-    maxD:=B2*rad;
-    
-    distanceToEnd=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex});
-    
-    moved:=false;
-    for j from 0 to numMini-1 do (
-        distanceBetween=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
+    listOfIndices=new MutableList from (numMini:null);
+
+    --rather than considering all t values at every jump, we eliminate points we already know are "behind" us 
+    iterateOnceHelper=(F, xi, i, indexP, endIndex, listOfIndices, lastIndex)->{
+        --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
+        --otherwise M2 overwrites g upon each recursive step
+        pades:=getApprox(F, xi,i, tableLOP#(indexP_0)#(indexP_1));
+        rad:=getD(pades);
+        minD:=B1*rad;
+        maxD:=B2*rad;
+
+        distanceToEnd:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex});
         
-        --so are looking at different portals and want to continue
-        if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd and minD<distanceBetween and distanceBetween<maxD then ( 
-        --if j!=i and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd then (
-        --if j!=i and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and distanceBetween<getD(pades) then (
-            potentialZero:=inRGA(F, pades, i, j, indexP);
-            
-             --JUST DEBUGGING STUFF, DELETE LATER
-             -*
-            couldJump;
-            if ((not(potentialZero_0) and potentialZero_1==-1) or potentialZero_0) then couldJump=true else couldJump=false;
-            print("rad was ",rad," with minD ", minD, "and maxD", maxD);
-            print(" Distance to jump was ", getNorm({(tableLOP_(indexP_0)_(indexP_1))_i}, {(tableLOP_(indexP_0)_(indexP_1))_j}), " and jump was/n't successful: " , couldJump);
-            *-
-            
-            if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); moved:=true; return {};);
-            if potentialZero_0 then (
-                --if reached then end, return the new zero that was found
-                if j==endIndex then (print("INDEED REACHED END PORTAL"); return potentialZero_1) ;
-            
-                --print(getD(pades), distanceBetween);
-            
-                --if found newSol and should keep going, then calls on new solution pair
-                moved:=true;
-                if verbose then print("mini woohoo");
-                return iterateOnce(F, potentialZero_1, j, indexP, endIndex);
+        nextList:=new MutableList from (numMini:null);
+        nextLastIndex:=0;
+
+        for temp from 0 to lastIndex-1 do (
+            j=listOfIndices#temp;
+            --so if reachable, would want to jump, so is a candidate
+            if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd then (
+                nextList#nextLastIndex=j;
+                nextLastIndex=nextLastIndex+1;
+                distanceBetween:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
                 
-                --above return: breaks dfs, i.e., only ever jump once for a given (sol, t0) pair
-            );
+                --now see if actually reachable
+                if minD<distanceBetween and distanceBetween<maxD then (
+                    potentialZero:=inRGA(F, pades, i, j, indexP);
+                    if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
+                    if potentialZero_0 then (
+                        --if reached then end, return the new zero that was found
+                        if j==endIndex then (print("INDEED REACHED END PORTAL"); return potentialZero_1) ;
+
+                        --if found newSol and should keep going, then calls on new solution pair
+                        if verbose then print("mini woohoo");
+                        return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, nextList, nextLastIndex);
+
+                        --above return: breaks dfs, i.e., only ever jump once for a given (sol, t0) pair
+                    );--if
+                );--if
+            );--if
+        );--for
         
-        );
-    );
-    if not moved then(
-        print((tableLOP#(indexP_0)#(indexP_1))#i, getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex}));
-        curT=(tableLOP#(indexP_0)#(indexP_1))#i;
+        start; if lastIndex==0 then start =0 else start=listOfIndices#(lastIndex-1)+1;
+        
+        for j from start to numMini-1 do(
+            if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd then (
+                nextList#nextLastIndex=j;
+                nextLastIndex=nextLastIndex+1;
+                distanceBetween:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
+
+                if minD<distanceBetween and distanceBetween<maxD then (
+                    potentialZero:=inRGA(F, pades, i, j, indexP);
+                    if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
+                    if potentialZero_0 then (
+                        if j==endIndex then (print("INDEED REACHED END PORTAL"); return potentialZero_1) ;
+                        if verbose then print("mini woohoo");
+                        return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, nextList, nextLastIndex);
+                    );--if
+                    );--if
+            );--if
+        );--for
+        --print((tableLOP#(indexP_0)#(indexP_1))#i, getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex}));
+    
+        --so didn't move
+        curT:=(tableLOP#(indexP_0)#(indexP_1))#i;
         --overwrites t for being bad, now will never jump here, unless is start or end
         if i!=0 and i!=1 then (tableLOP#(indexP_0)#(indexP_1))#i=-10;
+        return homCtn(F, xi, curT, indexP, endIndex);
         
-       return homCtn(F, xi, curT, indexP, endIndex);
-    );
+
+    };
+
+    return iterateOnceHelper(F, xi, i, indexP, endIndex, {},0);
 };
 
 --homotopy continuation add on:
@@ -413,7 +436,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 homCtn=(F, xi, curT, indexP, endIndex)->{
     --no longer pass in index of curT b/c want to throw that index out for failing
     --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
-    print curT;
+    --print curT;
     goalT=(tableLOP#(indexP_0)#(indexP_1))#endIndex;
     
     curX=point{xi};
@@ -554,9 +577,7 @@ initializeDataStructs=(F, x0, t0)->{
     for k from 0 to numMega-1 do tableLOP#k=new MutableList from tableLOP#k;
     for i from 0 to numMega-1 do for j from 0 to numMega-1 do(
         if i<j then (
-            print (tableLOP#i)#j;
             (tableLOP#i)#j =new MutableList from (tableLOP#i)#j;
-            print (tableLOP#i)#j;
         );
     );
 
