@@ -4,16 +4,15 @@
 --now takes random portals
 --does variation of complete graph implementation-ish from Duff paper
 --now have portals drawn from unit circle centered at 0.5 to make edges more symmetric
---have stopping criterion for edges
---need overall stopping criterion
---now does [L/M] Pade approximation, but does not yet take into account radius of convergence or error estimate
+--now does [L/M] Pade approximation
 --cut dfs off, i.e., can only ever jump once for a given (sol, t0) pair
 --no, just break if a jump to a portal finds an old solution 
     --(still move toward enpoint by only considering jumping to points that decrease distance to endpoint
 --finally actually only track solutions that haven't been tracked yet
 --now if can't jump all the way to the end (not enough portals), just straight line homotopy to the destination
---tree is not yet implemented
+--tree is not yet implemented (and won't be, is too much prepocessing)
 --cyclic 3 roots now takes only around 20 seconds to run
+--if a point "fails" (i.e., can't jump forward from it), is thrown out (speeds up later path trackings over same line reduction)
 
 
 needsPackage "NumericalAlgebraicGeometry";
@@ -190,7 +189,7 @@ getPSApprox=(F, t0, sol, ord)->{
 --E: returns an L/M Pade approximation that approximates F near (xi,ti)
 
 getApprox=(F, xi, i, listOfPortals)->{
-    ti = (listOfPortals_i)_CC;
+    ti = (listOfPortals#i)_CC;
     
     psApprox=getPSApprox(F, ti, xi, L+M);
     
@@ -304,8 +303,8 @@ stoppingCrit=(j,i)->{
 --note: indeed checks how far xj is from initGuess as you keep doing Newton's, and also checks fwdError at end
 
 inRGA=(F, fti, i0, j, indexP)-> {
-    tj=((tableLOP_(indexP_0)_(indexP_1))_j)_CC;
-    ti=((tableLOP_(indexP_0)_(indexP_1))_i0)_CC;
+    tj=((tableLOP#(indexP_0)#(indexP_1))#j)_CC;
+    ti=((tableLOP#(indexP_0)#(indexP_1))#i0)_CC;
     specF=specializeSystem(point{{tj}}, F);
     
     --initGuess=flatten(toList(entries(evaluate(fti,point{{tj}}))));
@@ -315,7 +314,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
         
         for i from 1 to numNewton do (
             xj=newton(polySystem(specF),xj);
-            if getNorm(initGuess, xj.Coordinates) >= epsilon then ( return (false,1););
+            if getNorm(initGuess, xj.Coordinates) >= epsilon then (print("jump failed--newton bounced"); return (false,1););
         
         );
     ) then (
@@ -331,6 +330,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
             );
         
         ) else (
+            print("jump failed--fwd error too big");
             return (false, 1);
         );
         
@@ -343,7 +343,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
 --R: an (xi,listOfPortals_i) solution pair to the family/polySystem F. xi is a list listOfPortals_i is a CC
    --index=(a,b) such that tableLOP_a_b=listOfPortals is the correct list of portals
     --endIndex is 0 or 1, denoting the position of the end portal within listOfPortals. Once get here, return
---M: calls functions that add solutions to portals
+--M: calls functions that add solutions to portals. also if a t value fails (can't jump anywhere), overwrites it with far away t (throws it out)
 --E: performs MODIFIED dfs on directed graph (that it creates) until all avenues have been exhasted, or until stoppingCrit met
     --stopping crit is now reaching "the end of the path"
     --MODIFIED: i.e., not really dfs anymore, since once you at each (sol, t0) pair, you can only jump once now
@@ -353,21 +353,21 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
     --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
     --otherwise M2 overwrites g upon each recursive step
     
-    pades:=getApprox(F, xi,i, tableLOP_(indexP_0)_(indexP_1));
+    pades:=getApprox(F, xi,i, tableLOP#(indexP_0)#(indexP_1));
     rad:=getD(pades);
     minD:=B1*rad;
     maxD:=B2*rad;
     
-    distanceToEnd=getNorm({(tableLOP_(indexP_0)_(indexP_1))_i}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex});
+    distanceToEnd=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex});
     
     moved:=false;
     for j from 0 to numMini-1 do (
-        distanceBetween=getNorm({(tableLOP_(indexP_0)_(indexP_1))_i}, {(tableLOP_(indexP_0)_(indexP_1))_j});
+        distanceBetween=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
         
         --so are looking at different portals and want to continue
-        --if j!=i and not(doReturn) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and minD<distanceBetween and distanceBetween<maxD then ( 
-        --if j!=i and not(doReturn) and not(stoppingCrit(i, endIndex)) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd then (
-        if j!=i and not(doReturn) and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and distanceBetween<getD(pades) then (
+        if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd and minD<distanceBetween and distanceBetween<maxD then ( 
+        --if j!=i and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd then (
+        --if j!=i and getNorm({(tableLOP_(indexP_0)_(indexP_1))_j}, {(tableLOP_(indexP_0)_(indexP_1))_endIndex})<distanceToEnd and distanceBetween<getD(pades) then (
             potentialZero:=inRGA(F, pades, i, j, indexP);
             
              --JUST DEBUGGING STUFF, DELETE LATER
@@ -395,7 +395,14 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         
         );
     );
-    if not moved then time return homCtn(F, xi, i, indexP, endIndex);
+    if not moved then(
+        print((tableLOP#(indexP_0)#(indexP_1))#i, getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex}));
+        curT=(tableLOP#(indexP_0)#(indexP_1))#i;
+        --overwrites t for being bad, now will never jump here, unless is start or end
+        if i!=0 and i!=1 then (tableLOP#(indexP_0)#(indexP_1))#i=-10;
+        
+       return homCtn(F, xi, curT, indexP, endIndex);
+    );
 };
 
 --homotopy continuation add on:
@@ -403,9 +410,11 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 --M: none
 --E: returns solution found at end of hom ctn
 
-homCtn=(F, xi, i, indexP, endIndex)->{
-    curT=(tableLOP_(indexP_0)_(indexP_1))_i;
-    goalT=(tableLOP_(indexP_0)_(indexP_1))_endIndex;
+homCtn=(F, xi, curT, indexP, endIndex)->{
+    --no longer pass in index of curT b/c want to throw that index out for failing
+    --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
+    print curT;
+    goalT=(tableLOP#(indexP_0)#(indexP_1))#endIndex;
     
     curX=point{xi};
     
@@ -444,7 +453,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     );
 
     newSol=rounds(roundTo,curX.Coordinates);
-    (tableSols_(indexP_0)_(indexP_1))#endIndex=(tableSols_(indexP_0)_(indexP_1))#endIndex +set{newSol};
+    (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
 };
@@ -538,6 +547,17 @@ initializeDataStructs=(F, x0, t0)->{
         ) else (
             return 0;
         );)
+    );
+
+    --have to make everything mutable to throw out "bad" portals
+    tableLOP=new MutableList from tableLOP;
+    for k from 0 to numMega-1 do tableLOP#k=new MutableList from tableLOP#k;
+    for i from 0 to numMega-1 do for j from 0 to numMega-1 do(
+        if i<j then (
+            print (tableLOP#i)#j;
+            (tableLOP#i)#j =new MutableList from (tableLOP#i)#j;
+            print (tableLOP#i)#j;
+        );
     );
 
     --for valid entries of the table, is a solutions hashTable corresponding to that "edge" (complex line)
@@ -696,7 +716,7 @@ solveAll=(F, x0, t0)->{
     --makes sure that the seed solutions pair is indeed legitimate
     assert (getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{t0}, F)), point{x0})))))<epsilon);
 
-    initializeDataStructs(F,x0,t0);
+    time initializeDataStructs(F,x0,t0);
     searchOuter(F, 0);
     return megaSols#0;
     
@@ -713,8 +733,8 @@ doReturn=false;
 verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
-epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
-fwdErrB=0.2; --determines max fwdErr
+epsilon=0.15; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
+fwdErrB=0.1; --determines max fwdErr
 orderDeg=1; --determines the order of the funciton approximation
 e=0.2; --how far away from seed to sample points in funcApprox
 numMini=500; --number of points to be in complex line rga case
@@ -724,8 +744,8 @@ stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
 numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
 L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
-B1=0.5; --lower bound scalar for jump zone annulus
-B2=1.2; --uper bound scalar for jump zone annulus
+B1=0; --lower bound scalar for jump zone annulus
+B2=0.8; --upper bound scalar for jump zone annulus
 B3=0.7;--jump size in hom ctn
 
 numHoms=0; --number of straight-line "homotopies" to do between p0 and fixed p1
@@ -767,6 +787,7 @@ parametrizedCyclic = n -> (
 polys = parametrizedCyclic 3;
 
 time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+print length(toList(mo));
 print peek megaSols;
 
 
