@@ -75,14 +75,16 @@ evaluateAt=(Pade, basePt, newT)->{
 
 convertToPade=(coeffs, m, n)->{
     assert(n+m<=length(coeffs));
-    --alright, so problem is if power series doesn't have high enough terms, 
-    --then bottomMat is just the zero matrix
-    bottomMat=map(CC^n, CC^(n+1), (i,j)-> sub(coeffs_(m+1+i-j),CC));
-    denomQ=(entries(transpose(gens(kernel(bottomMat)))))_0;
     
-    --print("bottom map is", bottomMat);
-    --print("entire kernel is", entries(gens(kernel(bottomMat))));
-    --print("denomQ is thus ", denomQ);
+    if M==1 then(
+        --just manually find trivial kernel, should be fast
+        denomQ={sub(coeffs_(m+1-1), CC), sub(-1*coeffs_(m+1),CC)};
+    ) else (
+        bottomMat=map(CC^n, CC^(n+1), (i,j)-> sub(coeffs_(m+1+i-j),CC));
+        --denomQ=(entries(transpose(gens(kernel(bottomMat)))))_0;
+        --below is hopefully faster
+        denomQ= flatten(entries(transpose((numericalKernel(bottomMat), Tolerance => 1e-3))#0));
+    );
     
     topMat=map(CC^(m+1), CC^(n+1), (i,j)->
         (if (i<j) then return 0 else return sub(coeffs_(i-j), CC);)
@@ -130,7 +132,6 @@ getPSApprox=(F, t0, sol, ord)->{
         apow=0;
         bpow=0;
         
-        
         --gets rid of trivial parts of system
         while A%t ==0 do(
             A=A//t;
@@ -144,7 +145,6 @@ getPSApprox=(F, t0, sol, ord)->{
             if b==0 then break;
         );
         
-        
         --want to iterate until get a t^{curMaxOrder+1}
         --M2 returns a degree of a constant to be -infinity for some reason
         iterateUntil;
@@ -155,7 +155,6 @@ getPSApprox=(F, t0, sol, ord)->{
         --sets the starting power of x_0
         bmina=bpow-apow;
         assert(bmina>=0);
-        
         
         indexer=0;
         aList={};
@@ -171,7 +170,7 @@ getPSApprox=(F, t0, sol, ord)->{
             for i from 1 to indexer do rhsStuff=rhsStuff-(aList_indexer)*(xList_(indexer-i));
           
             --assert(determinant(sub(aList_0,CC))!=0);
-            nextX=solve(sub(aList_0,CC), sub(rhsStuff,CC), Invertible=>true, MaximalRank=>true);
+            nextX=solve(sub(aList_0,CC), sub(rhsStuff,CC), Invertible=>true, MaximalRank=>true, ClosestFit=>true);
             xList=append(xList,nextX);
             
             curPower=curPower+apply(flatten(toList(entries(nextX))), i->i*t^bmina);
@@ -195,7 +194,6 @@ getApprox=(F, xi, i, listOfPortals)->{
     
     --refine the psApproximation, yes indeed does something
     for times from 1 to numGauss do psApprox=getPSApprox(F, ti, psApprox, L+M);
-    
     
     -*
     --turns list of polynomials into list of coefficients
@@ -275,24 +273,6 @@ getD=(pade)->{
     return minD;
 };
 
---R: j is an index of the current miniportal, i is the index of the end portal within the edge
---M:
---E: a placeholder function for stopping criterion
---note: VERY MUCH NEEDS EDITING
-
-stoppingCrit=(j,i)->{
-    if (stopEarly) then (
-          if (j==i) then(
-              print("INDEED REACHED THE END PORTAL");
-              doReturn=true;
-         );
-          return (j==i);
-    ) else (
-         return false;
-    );
-    
-};
-
 --R: a function fti approximating around xi0, ti0; and a new parameter value tj=listOfPortals_j; polySystem F
    --ti is a CC, xi is a list
    --index=(a,b) such that listOfPortals=tableLOP_a_b, and (tableSols_(index_0)_(index_1))=portals
@@ -353,7 +333,6 @@ inRGA=(F, fti, i0, j, indexP)-> {
 --NOTE: indeed checks how far one could jump in theory
 
 iterateOnce=(F, xi, i, indexP, endIndex)->{
-    listOfIndices=new MutableList from (numMini:null);
 
     --rather than considering all t values at every jump, we eliminate points we already know are "behind" us 
     iterateOnceHelper=(F, xi, i, indexP, endIndex, listOfIndices, lastIndex)->{
@@ -756,21 +735,15 @@ numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.15; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.1; --determines max fwdErr
-orderDeg=1; --determines the order of the funciton approximation
-e=0.2; --how far away from seed to sample points in funcApprox
 numMini=500; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
 onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
-stopEarly=true; --if true then stopCrit if reach ednpoint, otherwise no stopCrit
 numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
 L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
 B3=0.7;--jump size in hom ctn
-
-numHoms=0; --number of straight-line "homotopies" to do between p0 and fixed p1
-    --is useless now, b/c gamma trick is not applicable
     
 
 -*
