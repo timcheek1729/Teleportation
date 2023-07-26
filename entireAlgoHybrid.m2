@@ -752,14 +752,14 @@ findSeed=(F, p0)->{
     b:=evaluate(F, point{matrix 0_(CC^m)}, x0);
     
     --creates X
-    scan(m, i -> X = X | evaluate(polys, point I_{i}, x0) - b);
+    scan(m, i -> X = X | evaluate(F, point I_{i}, x0) - b);
 
     xp:=solve(X, -b, ClosestFit => true);
     K:=numericalKernel(X, Tolerance => 1e-5);
     xh:=K*random(CC^(numcols K), CC^1);
     p1:=point(xh+xp);
     
-    assert(norm(evaluate(polys, p1, x0))<0.01);
+    assert(norm(evaluate(F, p1, x0))<0.01);
     
     --now homotopy continuation this solution over to F_p
     reducedF=parametrizeFamily(F, p1.Coordinates, p0);
