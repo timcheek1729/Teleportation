@@ -13,6 +13,7 @@
 --tree is not yet implemented (and won't be, is too much prepocessing)(now prune list we check each jump)
 --cyclic 3 roots now takes only around 20 seconds to run
 --if a point "fails" (i.e., can't jump forward from it), is thrown out (speeds up later path trackings over same line reduction)
+--now has function that finds one initial solution to your desired system
 
 
 needsPackage "NumericalAlgebraicGeometry";
@@ -409,6 +410,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 
 --homotopy continuation add on:
 --R: Pade must be implemented (b/c uses a priori step size). Has same requirements as iteranteOnce
+  --: if indexP==(-1,-1), is flag that endIndex is actually goalT
+  --:also, F is of the form tA+(1-t)B
 --M: none
 --E: returns solution found at end of hom ctn
 
@@ -416,7 +419,8 @@ homCtn=(F, xi, curT, indexP, endIndex)->{
     --no longer pass in index of curT b/c want to throw that index out for failing
     --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
     --print curT;
-    goalT=(tableLOP#(indexP_0)#(indexP_1))#endIndex;
+    
+    if indexP==(-1,-1) then goalT=endIndex else goalT=(tableLOP#(indexP_0)#(indexP_1))#endIndex;
     
     curX=point{xi};
     
@@ -455,7 +459,7 @@ homCtn=(F, xi, curT, indexP, endIndex)->{
     );
 
     newSol=rounds(roundTo,curX.Coordinates);
-    (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
+    if indexP!=(-1,-1) then (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
 };
@@ -468,7 +472,7 @@ parametrizeFamily=(F, p0, p1)->{
 
     listOfVariables=gens(ring(F));
     listOfParams=parameters(F);
-    combinedListOfVariables=append(listOfVariables, t); 
+    combinedListOfVariables=append(listOfVariables, "t"); 
     everythingList=join(listOfParams, combinedListOfVariables);
     everythingRing=CC[everythingList];
     use everythingRing;
@@ -730,12 +734,46 @@ solsNotTracked;
 solsTracked;
 doReturn=false;
 
+--R: F is a polysystem and p0 a parameter (list) s.t. F(x,p0)=0 is the system you want to find a solution to
+  --:p\in C^m, x\in C^n, and m>=n (otherwise error)
+  --: needs parametrizeFamiy and homCtn implemented
+--M: nothing
+--E: returns a solution x' to F(x,p0)=0
+--note: first half it taken from Duff's algorithm
+
+findSeed=(F, p0)->{
+    n:=F.NumberOfVariables;
+    m:=length(parameters(F));
+    N:=F.NumberOfPolys;
+    assert(m>=n);
+    x0:=point{random(CC^1,CC^n)};
+    I:=id_(CC^m);
+    X:=random(CC^N,CC^0);
+    b:=evaluate(F, point{matrix 0_(CC^m)}, x0);
+    
+    --creates X
+    scan(m, i -> X = X | evaluate(polys, point I_{i}, x0) - b);
+
+    xp:=solve(X, -b, ClosestFit => true);
+    K:=numericalKernel(X, Tolerance => 1e-5);
+    xh:=K*random(CC^(numcols K), CC^1);
+    p1:=point(xh+xp);
+    
+    assert(norm(evaluate(polys, p1, x0))<0.01);
+    
+    --now homotopy continuation this solution over to F_p
+    reducedF=parametrizeFamily(F, p1.Coordinates, p0);
+    
+    return homCtn(reducedF, x0.Coordinates, 1, (-1,-1), 0);
+
+};
+
 verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
-epsilon=0.15; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
+epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
 fwdErrB=0.1; --determines max fwdErr
-numMini=500; --number of points to be in complex line rga case
+numMini=100; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
 onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
@@ -780,7 +818,10 @@ parametrizedCyclic = n -> (
 
 polys = parametrizedCyclic 3;
 
-time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+--time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+
+oneSol=findSeed(polys, {1,1,1,1,1,1,1,-1});
+time mo=solveAll(polys, oneSol, {1,1,1,1,1,1,1,-1});
 print length(toList(mo));
 print peek megaSols;
 
