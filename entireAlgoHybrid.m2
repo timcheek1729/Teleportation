@@ -282,6 +282,7 @@ getD=(pade)->{
     --if f does approximates F_tj well and finds a newSolution, then returns (true, newSolution)
     --otherwise false, with an integer indicator for whether newton errors, f a bad approx, or sol already known
 --note: indeed checks how far xj is from initGuess as you keep doing Newton's, and also checks fwdError at end
+--note: slight discrepancies between this and what's written in the paper, need to edit
 
 inRGA=(F, fti, i0, j, indexP)-> {
     tj=((tableLOP#(indexP_0)#(indexP_1))#j)_CC;
