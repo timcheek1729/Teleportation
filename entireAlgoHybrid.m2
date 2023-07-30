@@ -668,6 +668,7 @@ searchOuter=(F, i)->{
 
 
                 if verbose then print("Tracking ", x0, "from", megaLOP_i, "to", megaLOP_j);
+                numTracked=numTracked+1;
             
                 doReturn=false;
                 newSol;
@@ -723,6 +724,7 @@ solveAll=(F, x0, t0)->{
 
     time initializeDataStructs(F,x0,t0);
     searchOuter(F, 0);
+    print("Paths tracked is", numTracked);
     return megaSols#0;
     
 };
@@ -783,6 +785,7 @@ M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
 B3=0.7;--jump size in hom ctn
+numTracked=0;
     
 
 -*
