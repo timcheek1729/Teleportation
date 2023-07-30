@@ -821,8 +821,11 @@ polys = parametrizedCyclic 3;
 
 --time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 
-oneSol=findSeed(polys, {1,1,1,1,1,1,1,-1});
-time mo=solveAll(polys, oneSol, {1,1,1,1,1,1,1,-1});
+param=(#(parameters(polys))-1:1);
+param=toList(append(param, -1));
+
+oneSol=findSeed(polys, param);
+time mo=solveAll(polys, oneSol, param);
 print length(toList(mo));
 print peek megaSols;
 
