@@ -171,7 +171,7 @@ getPSApprox=(F, t0, sol, ord)->{
             for i from 1 to indexer do rhsStuff=rhsStuff-(aList_indexer)*(xList_(indexer-i));
           
             --assert(determinant(sub(aList_0,CC))!=0);
-            nextX=solve(sub(aList_0,CC), sub(rhsStuff,CC), Invertible=>true, MaximalRank=>true, ClosestFit=>true);
+            nextX=solve(sub(aList_0,CC), sub(rhsStuff,CC), ClosestFit=>true);
             xList=append(xList,nextX);
             
             curPower=curPower+apply(flatten(toList(entries(nextX))), i->i*t^bmina);
