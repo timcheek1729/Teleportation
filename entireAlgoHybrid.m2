@@ -240,15 +240,6 @@ getNorm=(list1, list2)->{
     return sqrt(s);
 };
 
---apparently overloaded functions are not a thing in Macualay2
-getNorm2=(list1)->{
-    s=0;
-    for x in (list1) do (
-        s=s+(realPart(x))^2+(imaginaryPart(x))^2;
-    );
-    return sqrt(s);
-};
-
 --R: pade a list of pairs (numPade, denomPade)
 --M: none
 --E: returns distance to the nearest pole
@@ -263,11 +254,11 @@ getD=(pade)->{
         assert(length(denom)==2);
         
         --if coefficient on t is basically 0, then no pole
-        if getNorm2({denom_1})<0.01 then (
+        if norm(denom_1)<0.01 then (
             minD=1;
             break;
         ) else (
-            dfromCenter=getNorm2({(-1.0*denom_0)/(denom_1)});
+            dfromCenter=norm((-1.0*denom_0)/(denom_1));
             if dfromCenter<minD then minD=dfromCenter;
         );
     );
@@ -303,7 +294,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
         
         );
     ) then (
-        fwdError=getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj}}, F)), xj)))));
+        fwdError=norm(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj}}, F)), xj)))));
         --print fwdError;
         if (getNorm(initGuess, xj.Coordinates) < epsilon) and (fwdError<fwdErrB) then (
         
@@ -720,7 +711,7 @@ searchOuter=(F, i)->{
 
 solveAll=(F, x0, t0)->{
     --makes sure that the seed solutions pair is indeed legitimate
-    assert (getNorm2(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{t0}, F)), point{x0})))))<epsilon);
+    assert (norm(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{t0}, F)), point{x0})))))<epsilon);
 
     time initializeDataStructs(F,x0,t0);
     searchOuter(F, 0);
