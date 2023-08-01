@@ -450,6 +450,9 @@ homCtn=(F, xi, curT, indexP, endIndex)->{
         );
     );
 
+    timesCor=0;
+    while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
+
     newSol=rounds(roundTo,curX.Coordinates);
     if indexP!=(-1,-1) then (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
