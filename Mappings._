@@ -1,0 +1,28 @@
+needsPackage "NumericalAlgebraicGeometry";
+
+R = CC;
+
+CtoS2 = z -> {
+    re = realPart{z};
+    im = imaginaryPart{z};
+    norm = re^2 + im^2 + 1;
+    return point {{2*re/norm, 2*im/norm, (norm-2)/norm}}
+    }
+
+S2toC = pt -> {
+    x = (coordinates pt)_0;
+    y = (coordinates pt)_1;
+    z = (coordinates pt)_2;
+    return (x+y*ii)/z
+    }
+
+CtoP = z -> {1,z}
+
+PtoC = l -> {
+    if l_0 == 0 then return "wrong" else return l_1/l_0
+    }
+
+PtoS2 = {a,b} -> CtoS2(PtoC({a,b}))
+
+S2toP = pt -> CtoP(S2toC(pt))
+
