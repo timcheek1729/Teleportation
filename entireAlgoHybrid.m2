@@ -730,6 +730,7 @@ parametrizations=table;
 solsNotTracked;
 solsTracked;
 doReturn=false;
+numTracked=0;
 
 --R: F is a polysystem and p0 a parameter (list) s.t. F(x,p0)=0 is the system you want to find a solution to
   --:p\in C^m, x\in C^n, and m>=n (otherwise error)
@@ -779,7 +780,6 @@ M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
 B3=0.7;--jump size in hom ctn
-numTracked=0;
     
 
 -*
