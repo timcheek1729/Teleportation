@@ -1,0 +1,91 @@
+Triangle=new Type of MutableHashTable;
+LevelList=new Type of MutableList;
+--SingleLevel=new Type of MutableHashTable;
+VertexTriangleContanment= new Type of MutableHashTable;
+Vertex=new Type of MutableHashTable;
+
+maxLevel=3;
+assert(maxLevel>0);
+
+
+--level=new LevelList from {Indices => new MutableHashTable from {} };
+level=new LevelList from {0..maxLevel};
+vertexIndexList=new MutableList from {0..5}; --is list of vertices
+--vertex triangle containment list
+--index of vertex from above corr to partial list of triangles that the vertex lies in
+vertexTC=new VertexTriangleContanment from {}; 
+
+--R: nothing
+--M: nothing
+--E: returns a random point on the unit sphere in R^3
+randomS2point=()->{
+    a:=exp(2*pi*ii*random(RR));
+    b:=exp(2*pi*ii*random(RR));
+    c:=exp(2*pi*ii*random(RR));
+    d:=1.0/sqrt(a*a+b*b+c*c);
+    return {a/d, b/d, c/d};
+};
+
+--creates initial 6 vertices (8 level zero triangles); puts them in levels
+--R: none
+--M: none
+--E: returns mutable list of levels (a list of list of triangles), list of vertices, and
+     --hashtable w/ key =index of vertice from the list, value= triangles the vertex lies in
+initializeLevelZero=method();
+initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList, vertexTC)->{
+    basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true};
+    vertexIndexList#0=basePT;
+    
+    topPT:= new Vertex from {Points=> {0,0,1}, valid=> true}; 
+    vertexIndexList#1=topPT;
+    
+    --other 4 points which make up our initial triangulation
+    pt1:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    vertexIndexList#2=pt1;
+    pt2:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    vertexIndexList#3=pt2;
+    pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    vertexIndexList#4=pt3;
+    pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    vertexIndexList#5=pt4;
+    
+    --creating triangles: project these 4 points down to xy-axis, then sort x coords into left and right
+    --by comparing y coords within each of the pairs, we get a sort of quadrant decomposition
+    
+    
+    --need to edit vertexTC
+    
+    --HERE! add the 8 triangles to level#0
+    
+    
+    -- creates empty rows of garbage values to ensure when O(numLevel) search for triangle containment occurs,
+      --one can actually traverse down correctly
+      --(i.e., index of lower faces do not change when other faces of same level are created
+    for i from 1 to maxLevel do (
+        level#i=new MutableList from (8*4^i:null); --there is a maximum of 8(4^i) triangles at each level
+    );
+    
+};
+
+--
+--R: Levels#level#numTriangle is the face to be midpointed
+--M: 
+--E:
+createLowerTriangle=(level, numTriangle)->{
+    
+    
+};
+
+--need something to update triangles that the point is in
+
+t1=new Triangle from {1,2,3,4};
+
+stuff=new MutableList from {t1,t1};
+stuff#0#3=null
+peek stuff#0
+peek stuff#1
+peek t1
+
+stuff2={}
+stuff2=append(stuff2, stuff#0)
+peek stuff2#0
