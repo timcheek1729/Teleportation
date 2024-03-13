@@ -26,6 +26,26 @@ randomS2point=()->{
     return {a/d, b/d, c/d};
 };
 
+--projects them down to xy axis, returns them in order so that they bound a regular polygon
+  --i.e., the polygon does not intersect itself
+--R: 4 points of type Vertex, sorted by x-coordinate (!)
+--M: none
+--E: returns 4 points sorted so that they bound a regular polygon
+sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
+    assert(a.Points#0<= b.Points#0 and b.Points#0<= c.Points#0 and c.Points#0<= d.Points#0);
+    s={a};
+    e={b};
+    
+    --see if b, c lie above the line connecting ad
+    --compute cross product of (ab,bd); (ac, cd); in 2d projection
+    --if cross product is positive, then is below; negative then is above
+    if 
+    
+    
+    return(join(s,e));
+};
+
+
 --creates initial 6 vertices (8 level zero triangles); puts them in levels
 --R: none
 --M: none
@@ -39,19 +59,49 @@ initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList
     topPT:= new Vertex from {Points=> {0,0,1}, valid=> true}; 
     vertexIndexList#1=topPT;
     
+    a;b;c;d;
     --other 4 points which make up our initial triangulation
     pt1:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#2=pt1;
     pt2:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#3=pt2;
+    
+    --projecting down to xy-axis, have a be the left point and b be the right point
+    if pt1.Points#0<pt2.Points#0 then (a=pt1; b=pt2) else (a=pt2; b=pt1);
+    
     pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#4=pt3;
+    if pt3.Points#0< a.Points#0 then (
+        c=b; b=a; a=pt2;
+        ) else if pt3.Points#0<b.Points#0 then (
+             c=b; b=pt3;
+        ) else (
+             c=pt3;
+        );
+    
     pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#5=pt4;
+    if pt4.Points#0 < c.Points#0 then (
+        d=c;
+        if pt4.Points#0<b.Points#0 then (
+            c=b;
+            if pt4.Points#0<a.Points#0 then (
+                b=a; a=pt4;
+            ) else (
+                b=pt4;
+            );
+        ) else (
+            c=pt4;
+        );
+    ) else (--is NOT left of c, so is right of c
+      d=pt4;
+    );
+    --now a,b,c,d are points sorted by their x coordinates
     
-    --creating triangles: project these 4 points down to xy-axis, then sort x coords into left and right
-    --by comparing y coords within each of the pairs, we get a sort of quadrant decomposition
+    --sorts these points so that their projection bounds a regular (non self intersecting polygon)
+    {a,b,c,d}=sortSquare(a,b,c,d);
     
+   
     
     --need to edit vertexTC
     
