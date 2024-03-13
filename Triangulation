@@ -18,12 +18,13 @@ vertexTC=new VertexTriangleContanment from {};
 --R: nothing
 --M: nothing
 --E: returns a random point on the unit sphere in R^3
+--
 randomS2point=()->{
-    a:=exp(2*pi*ii*random(RR));
-    b:=exp(2*pi*ii*random(RR));
-    c:=exp(2*pi*ii*random(RR));
+    a:=random(RR);
+    b:=random(RR);
+    c:=random(RR);
     d:=1.0/sqrt(a*a+b*b+c*c);
-    return {a/d, b/d, c/d};
+    return {a*d, b*d, c*d};
 };
 
 --projects them down to xy axis, returns them in order so that they bound a regular polygon
@@ -31,18 +32,34 @@ randomS2point=()->{
 --R: 4 points of type Vertex, sorted by x-coordinate (!)
 --M: none
 --E: returns 4 points sorted so that they bound a regular polygon
+sortSquare=method();
 sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
     assert(a.Points#0<= b.Points#0 and b.Points#0<= c.Points#0 and c.Points#0<= d.Points#0);
     s={a};
-    e={b};
+    e={d};
     
     --see if b, c lie above the line connecting ad
     --compute cross product of (ab,bd); (ac, cd); in 2d projection
     --if cross product is positive, then is below; negative then is above
-    if 
+    v=[(d.Points#0)-(a.Points#0),(d.Points#1)-(a.Points#1)];
+    vForB=[(d.Points#0)-(b.Points#0), (d.Points#1)- (b.Points#1)];
+    vForC=[(d.Points#0)-(c.Points#0), (d.Points#1)- (c.Points#1)];
     
+    if v_0 * vForB_1 - v_1 * vForB_0 < 0 then (--so b is below the line
+        s=append(s, b);
+    ) else (
+        e=append(e, b);
+    );
     
-    return(join(s,e));
+    if v_0 * vForC_1 - v_1* vForC_0 < 0 then (--so b is below the line
+        s=append(s, c);
+    ) else (
+        e=append(e, c);
+    );
+
+    --now need to sort s, e be x coordingate in increasing and decreasing order!!
+
+    return(toSequence(join(s,e)));
 };
 
 
@@ -72,12 +89,12 @@ initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList
     pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#4=pt3;
     if pt3.Points#0< a.Points#0 then (
-        c=b; b=a; a=pt2;
-        ) else if pt3.Points#0<b.Points#0 then (
-             c=b; b=pt3;
-        ) else (
-             c=pt3;
-        );
+        c=b; b=a; a=pt3;
+    ) else if pt3.Points#0<b.Points#0 then (
+        c=b; b=pt3;
+    ) else (
+       c=pt3;
+    );
     
     pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     vertexIndexList#5=pt4;
@@ -97,6 +114,11 @@ initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList
       d=pt4;
     );
     --now a,b,c,d are points sorted by their x coordinates
+    
+    print peek a
+    print peek b
+    print peek c
+    print peek d
     
     --sorts these points so that their projection bounds a regular (non self intersecting polygon)
     {a,b,c,d}=sortSquare(a,b,c,d);
