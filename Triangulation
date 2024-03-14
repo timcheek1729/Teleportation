@@ -35,8 +35,8 @@ randomS2point=()->{
 sortSquare=method();
 sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
     assert(a.Points#0<= b.Points#0 and b.Points#0<= c.Points#0 and c.Points#0<= d.Points#0);
-    s={a};
-    e={d};
+    s=new MutableList from {a};
+    e=new MutableList from {d};
     
     --see if b, c lie above the line connecting ad
     --compute cross product of (ab,bd); (ac, cd); in 2d projection
@@ -57,10 +57,35 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
         e=append(e, c);
     );
 
-    --now need to sort s, e be x coordingate in increasing and decreasing order!!
+    --now need to sort s (resp. e) be x-coordingate in increasing (resp. decreasing) order
+    --do not need to sort s if it has 2 elements, since (s_0).Points#0 is least number, so already will be in inc order
+    if #s>2 then (--just swap last 2 vertices if needed
+        if (s#1).Points#0 > (s#2).Points#0 then (
+            temp=s#1;
+            s#1 =s#2;
+            s#2 =temp;
+        );
+    );
+
+    --now for e, this needs to be sorted in decreasing order 
+    --(d was put at the beginning so again, only need to look at last 2 elements if #e>2
+    if #e>2 then (--just swap last 2 vertices if needed
+        if (e#1).Points#0 < (e#2).Points#0 then (
+            temp=e#1;
+            e#1 =e#2;
+            e#2 =temp;
+        );
+    );
+        
 
     return(toSequence(join(s,e)));
 };
+
+--a=new Vertex from {Points=> {.0877284,.134503,.987022}, valid=>true};
+--b=new Vertex from {Points=> {.76403,.0742533,.640894}, valid=>true};
+--c=new Vertex from {Points=> {.830945,.143911,.53742}, valid=>true};
+--d=new Vertex from {Points=> {.936365,.254446,.241821}, valid=>true};
+
 
 
 --creates initial 6 vertices (8 level zero triangles); puts them in levels
