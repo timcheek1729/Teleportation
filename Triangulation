@@ -1,19 +1,9 @@
-Triangle=new Type of MutableHashTable;
+Triangle=new Type of List;
 LevelList=new Type of MutableList;
 --SingleLevel=new Type of MutableHashTable;
 VertexTriangleContanment= new Type of MutableHashTable;
 Vertex=new Type of MutableHashTable;
 
-maxLevel=3;
-assert(maxLevel>0);
-
-
---level=new LevelList from {Indices => new MutableHashTable from {} };
-level=new LevelList from {0..maxLevel};
-vertexIndexList=new MutableList from {0..5}; --is list of vertices
---vertex triangle containment list
---index of vertex from above corr to partial list of triangles that the vertex lies in
-vertexTC=new VertexTriangleContanment from {}; 
 
 --R: nothing
 --M: nothing
@@ -35,15 +25,15 @@ randomS2point=()->{
 sortSquare=method();
 sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
     assert(a.Points#0<= b.Points#0 and b.Points#0<= c.Points#0 and c.Points#0<= d.Points#0);
-    s=new MutableList from {a};
-    e=new MutableList from {d};
+    s:=new MutableList from {a};
+    e:=new MutableList from {d};
     
     --see if b, c lie above the line connecting ad
     --compute cross product of (ab,bd); (ac, cd); in 2d projection
     --if cross product is positive, then is below; negative then is above
-    v=[(d.Points#0)-(a.Points#0),(d.Points#1)-(a.Points#1)];
-    vForB=[(d.Points#0)-(b.Points#0), (d.Points#1)- (b.Points#1)];
-    vForC=[(d.Points#0)-(c.Points#0), (d.Points#1)- (c.Points#1)];
+    v:=[(d.Points#0)-(a.Points#0),(d.Points#1)-(a.Points#1)];
+    vForB:=[(d.Points#0)-(b.Points#0), (d.Points#1)- (b.Points#1)];
+    vForC:=[(d.Points#0)-(c.Points#0), (d.Points#1)- (c.Points#1)];
     
     if v_0 * vForB_1 - v_1 * vForB_0 < 0 then (--so b is below the line
         s=append(s, b);
@@ -77,10 +67,10 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
         );
     );
         
-
     return(toSequence(join(s,e)));
 };
 
+--quick test below to make sure that squareSort actually works
 --a=new Vertex from {Points=> {.0877284,.134503,.987022}, valid=>true};
 --b=new Vertex from {Points=> {.76403,.0742533,.640894}, valid=>true};
 --c=new Vertex from {Points=> {.830945,.143911,.53742}, valid=>true};
@@ -94,7 +84,7 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
 --E: returns mutable list of levels (a list of list of triangles), list of vertices, and
      --hashtable w/ key =index of vertice from the list, value= triangles the vertex lies in
 initializeLevelZero=method();
-initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList, vertexTC)->{
+initializeLevelZero(LevelList, MutableList, VertexTriangleContanment):=(level, vertexIndexList, vertexTC)->{
     basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true};
     vertexIndexList#0=basePT;
     
@@ -140,21 +130,37 @@ initializeLevelZero(LevelList, MutableList, VertexList):=(level, vertexIndexList
     );
     --now a,b,c,d are points sorted by their x coordinates
     
-    print peek a
-    print peek b
-    print peek c
-    print peek d
+    --print peek a
+    --print peek b
+    --print peek c
+    --print peek d
     
     --sorts these points so that their projection bounds a regular (non self intersecting polygon)
     {a,b,c,d}=sortSquare(a,b,c,d);
     
+    t1:=new Triangle from {basePT, a, b};
+    t2:=new Triangle from {basePT, b, c};
+    t3:=new Triangle from {basePT, c, d};
+    t4:=new Triangle from {basePT, d, a};
+    t5:=new Triangle from {topPT, a, b};
+    t6:=new Triangle from {topPT, b, c};
+    t7:=new Triangle from {topPT, c, d};
+    t8:=new Triangle from {topPT, d, a};
+    
+    --associate triangles to vertices by inclusion
+    --is basepoint
+    vertexTC#0=new MutableHashTable from {Triangles=> new MutableList from {t1,t2,t3,t4}, Levels=>new MutableList from {0,0,0,0}, Indices=>new MutableList from{0,1,2,3}};
+    
+    --is top point
+    vertexTC#1=new MutableHashTable from {Triangles=> new MutableList from {t5,t6,t7,t8}, Levels=>new MutableList from {0,0,0,0}, Indices=>new MutableList from{4,5,6,7}};
+    
+    --VERY MUCH NEED TO CHECK IN ON LATER
+    --I supposed we can do triangle containment for the other points when we actually jump to that point
+    
+    
+    --these 8 triangles make up the level 0 triangulation
+    level#0={t1, t2, t3, t4, t5, t6, t7, t8};
    
-    
-    --need to edit vertexTC
-    
-    --HERE! add the 8 triangles to level#0
-    
-    
     -- creates empty rows of garbage values to ensure when O(numLevel) search for triangle containment occurs,
       --one can actually traverse down correctly
       --(i.e., index of lower faces do not change when other faces of same level are created
@@ -175,14 +181,26 @@ createLowerTriangle=(level, numTriangle)->{
 
 --need something to update triangles that the point is in
 
-t1=new Triangle from {1,2,3,4};
 
-stuff=new MutableList from {t1,t1};
-stuff#0#3=null
-peek stuff#0
-peek stuff#1
-peek t1
+maxLevel=3;
+assert(maxLevel>0);
 
-stuff2={}
-stuff2=append(stuff2, stuff#0)
-peek stuff2#0
+
+--level=new LevelList from {Indices => new MutableHashTable from {} };
+level=new LevelList from {0..maxLevel};
+vertexIndexList=new MutableList from {0..5}; --is list of vertices
+--vertex triangle containment list
+--index of vertex from above corr to partial list of triangles that the vertex lies in
+vertexTC=new VertexTriangleContanment from {}; 
+
+time initializeLevelZero(level, vertexIndexList, vertexTC)
+
+for i in 0..maxLevel do print peek level#i
+
+for x in vertexIndexList do print peek x
+
+for i in 0..1 do print peek vertexTC#i.Triangles
+
+
+
+
