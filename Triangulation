@@ -21,12 +21,12 @@ cppVector=new Type of MutableHashTable;
 pushBack:=(arr, x)->{
     if arr.theLength < #(arr.theCnts) then (
         (arr.theCnts)#(arr.theLength)=x;
-        a=arr.theLength;
+        a:=arr.theLength;
         arr.theLength=a+1;
     ) else (
        arr.theCnts= join(arr.theCnts, (arr.theLength: null));
        (arr.theCnts)#(arr.theLength)=x;
-       a=arr.theLength;
+       a:=arr.theLength;
        arr.theLength=a+1;
     );
 
@@ -142,34 +142,34 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
     pushBack(vertexIndexList, pt2);
     
     --projecting down to xy-axis, have a be the left point and b be the right point
-    if (pt1.Points)#0 < (pt2.Points)#0 then (a=pt1; b=pt2;) else (a=pt2; b=pt1;);
+    if (pt1.Points)#0 < (pt2.Points)#0 then (a=2; b=3;) else (a=3; b=2;);
     
     pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     pushBack(vertexIndexList,pt3);
-    if (pt3.Points)#0 < (a.Points)#0 then (
-        c=b; b=a; a=pt3;
-    ) else if pt3.Points#0<b.Points#0 then (
-        c=b; b=pt3;
+    if (pt3.Points)#0 < ((vertexIndexList@a).Points)#0 then (
+        c=b; b=a; a=4;
+    ) else if pt3.Points#0<((vertexIndexList@b).Points)#0 then (
+        c=b; b=4;
     ) else (
-       c=pt3;
+       c=4;
     );
     
     pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
     pushBack(vertexIndexList, pt4);
-    if pt4.Points#0 < c.Points#0 then (
+    if pt4.Points#0 < ((vertexIndexList@c).Points)#0 then (
         d=c;
-        if pt4.Points#0<b.Points#0 then (
+        if pt4.Points#0< ((vertexIndexList@b).Points)#0 then (
             c=b;
-            if pt4.Points#0<a.Points#0 then (
-                b=a; a=pt4;
+            if pt4.Points#0< ((vertexIndexList@a).Points)#0 then (
+                b=a; a=5;
             ) else (
-                b=pt4;
+                b=5;
             );
         ) else (
-            c=pt4;
+            c=5;
         );
     ) else (--is NOT left of c, so is right of c
-      d=pt4;
+      d=5;
     );
     --now a,b,c,d are points sorted by their x coordinates
     
@@ -179,7 +179,7 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
     --print peek d
     
     --sorts these points so that their projection bounds a regular (non self intersecting polygon)
-    {a,b,c,d}=sortSquare(a,b,c,d);
+    {a,b,c,d}=sortSquare(vertexIndexList@a,vertexIndexList@b,vertexIndexList@c,vertexIndexList@d);
     
     t1:=new Triangle from {Vertices=> {basePT, a, b}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>0};
     t2:=new Triangle from {Vertices=> {basePT, b, c}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>1};
@@ -208,13 +208,14 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
     
     
     --these 8 triangles make up the level 0 triangulation
-    triangleList={t1, t2, t3, t4, t5, t6, t7, t8};
-    
-    --pushBack(vertexIndexList, a);
-    --pushBack(vertexIndexList, b);
-    --pushBack(vertexIndexList, c);
-    --pushBack(vertexIndexList, d);
-    
+    pushBack(triangleList, t1);
+    pushBack(triangleList, t2);
+    pushBack(triangleList, t3);
+    pushBack(triangleList, t4);
+    pushBack(triangleList, t5);
+    pushBack(triangleList, t6);
+    pushBack(triangleList, t7);
+    pushBack(triangleList, t8);    
 };
 
 --
@@ -255,11 +256,16 @@ vertexTC=new cppVector from {theCnts=>new MutableList from {}, theLength=>0};
 
 time initializeLevelZero(triangleList, vertexIndexList, vertexTC)
 
-for i in 0..(triangleList.theLength-1) do print peek triangleList@i
+for i in 0..(triangleList.theLength-1) do print peek (triangleList@i).Vertices
 
 for x in vertexIndexList.theCnts do print peek x
 
---NOW SHOULD check vertexTC, this is really important!!
+--just gives how many triangles are associated with each index
+for x in (vertexTC.theCnts) do print peek x.theCnts
+
+for x in (vertexTC.theCnts) do(for y in x.theCnts do( print peek y.Vertices;);  print("-----"); );
+
+
 
 -*
 func1=()->{
