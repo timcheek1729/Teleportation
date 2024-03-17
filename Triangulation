@@ -256,10 +256,11 @@ createLowerTriangle(ZZ):=(i)->{
     --creates new triangles and adds them to the triangeList
     lastEntry=triangleList.theLength;
     
-    t1:= new Triangle from {Vertices=> {a, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+1};
-    t2:= new Triangle from {Vertices=> {b, newB, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+2};
-    t3:= new Triangle from {Vertices=> {c, newC, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+3};
-    t4:= new Triangle from {Vertices=> {newA, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+4};
+    --FIXED index issue below (next entry gets put in at lastEntry index, NOT lastEntry+1)
+    t1:= new Triangle from {Vertices=> {a, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry};
+    t2:= new Triangle from {Vertices=> {b, newB, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+1};
+    t3:= new Triangle from {Vertices=> {c, newC, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+2};
+    t4:= new Triangle from {Vertices=> {newA, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+3};
     
     pushBack(triangleList, t1);
     pushBack(triangleList, t2);
@@ -272,16 +273,48 @@ createLowerTriangle(ZZ):=(i)->{
     (triangleList@i).CT=t3;
     (triangleList@i).nT=t4;
 };
+--createLowerTriangle(0);
 
 
 --CHECK: need something to update triangles that the point is in
---R:
---M:
---E:
-getNextPt=()->{
+--R: i is index of point in vertexIndexList, j is index of triangle in vertexTC
+--M: adds smaller triangles to vertexTC@i
+--E: updates vertexTC with up to numLevel-many triangles
+--does like a DPS search but stops when hits a child node, returns index of that triangle
+getNextPt=method();
+getNextPt(ZZ,ZZ):=(i,j)->{
+    if class((triangleList@j).AT) === class(null) then return j;
+    
+    --observation to be made is that given a point in a triangulation,
+    --there's only on possible triangle (AT, BT, CT) this point can EVER be in, in the sucessive triangulations
   
-  
+    orient:=null;
+    if (triangleList@j).Vertices#0 === vertexIndexList@i then (orient=1;
+    ) else if (triangleList@j).Vertices#1 === vertexIndexList@i then (orient=2;
+    ) else if (triangleList@j).Vertices#2 === vertexIndexList@i then (orient=3;
+    ) else (
+        print("error");
+        print(i, j);
+        print("The vertex we are at is", peek (vertexIndexList@i));
+        print("Triangle we're supposed to be in is", peek (triangleList@j).Vertices);
+        assert(false);
+    );
+    
+  while not(class((triangleList@j).AT) === class(null)) do(
+      if orient==1 then (
+         pushBack((vertexTC@0), (triangleList@j).AT);
+         j=((triangleList@j).AT).Index;
+      ) else if orient ==2 then (
+         pushBack((vertexTC@0), (triangleList@j).BT);
+         j=((triangleList@j).BT).Index;
+      ) else (
+         pushBack((vertexTC@0), (triangleList@j).CT);
+         j=((triangleList@j).CT).Index;
+      );
+  );
+  return j;
 };
+--print getNextPt(0,0);
 
 
 triangleList=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
