@@ -6,18 +6,43 @@
 --SHOULD THIS ALSO CONTAIN ITS OWN INDEX?? I THINK YES, since 
 Triangle=new Type of MutableHashTable;
 
-
-LevelList=new Type of MutableList;
---SingleLevel=new Type of MutableHashTable;
-VertexTriangleContainment= new Type of MutableHashTable;
+--contains a triple (which is its xyz coordinates), as well as a ''valid'' boolaean (to denote if thrown out or not)
 Vertex=new Type of MutableHashTable;
 
---would be much more memory efficient FINISH HERE
+--Macualay2 doesn't have amortizes O(1) push back, so I implement it myself *sigh*
+--contains .theLength for USED length, and .theCnts for its contents
+cppVector=new Type of MutableHashTable;
+
+--R: a cppVector arr and any element x
+--M: the cppVector arr, both theCnts and theLength
+--E: in amortized O(1) time, adds in element to end, returns index where element was added
+--pushBack=method();
+--pushBack(cppVector, Triangle):=(arr, x)->{
+pushBack:=(arr, x)->{
+    if arr.theLength < #(arr.theCnts) then (
+        (arr.theCnts)#(arr.theLength)=x;
+        a=arr.theLength;
+        arr.theLength=a+1;
+    ) else (
+       arr.theCnts= join(arr.theCnts, (arr.theLength: null));
+       (arr.theCnts)#(arr.theLength)=x;
+       a=arr.theLength;
+       arr.theLength=a+1;
+    );
+
+    return (arr.theLength)-1;
+}
+--makes it easier to grab elements from the vector
+cppVector @ ZZ:=(arr,i)-> {return (arr.theCnts)#i;};
+--debugging below
+--arr1=new cppVector from {theCnts=>new MutableList, theLength=>0};
+--print peek arr1;
+--pushBack(arr1,{1});
+--print peek arr1;
 
 --R: nothing
 --M: nothing
 --E: returns a random point on the unit sphere in R^3
---
 randomS2point=()->{
     a:=random(RR);
     b:=random(RR);
@@ -32,7 +57,6 @@ Vertex + Vertex:=(x,y)-> new Vertex from {
     Points=>{0.5*(x.Points#0+y.Points#0), 0.5*(x.Points#1+y.Points#1), 0.5*(x.Points#2+y.Points#2)},
     valid=>true
 };
-
 
 
 --projects them down to xy axis, returns them in order so that they bound a regular polygon
@@ -102,26 +126,27 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
 --E: returns mutable list of levels (a list of list of triangles), list of vertices, and
      --hashtable w/ key =index of vertice from the list, value= triangles the vertex lies in
 initializeLevelZero=method();
-initializeLevelZero(LevelList, MutableList, VertexTriangleContainment):=(level, vertexIndexList, vertexTC)->{
+initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndexList, vertexTC)->{
     basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true};
-    vertexIndexList#0=basePT;
+    pushBack(vertexIndexList,basePT);
     
     topPT:= new Vertex from {Points=> {0,0,1}, valid=> true}; 
-    vertexIndexList#1=topPT;
+    pushBack(vertexIndexList, topPT);
     
     a;b;c;d;
     --other 4 points which make up our initial triangulation
     pt1:=new Vertex from {Points=> randomS2point(), valid=> true}; 
-    vertexIndexList#2=pt1;
+    pushBack(vertexIndexList, pt1);
+    
     pt2:=new Vertex from {Points=> randomS2point(), valid=> true}; 
-    vertexIndexList#3=pt2;
+    pushBack(vertexIndexList, pt2);
     
     --projecting down to xy-axis, have a be the left point and b be the right point
-    if pt1.Points#0<pt2.Points#0 then (a=pt1; b=pt2) else (a=pt2; b=pt1);
+    if (pt1.Points)#0 < (pt2.Points)#0 then (a=pt1; b=pt2;) else (a=pt2; b=pt1;);
     
     pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
-    vertexIndexList#4=pt3;
-    if pt3.Points#0< a.Points#0 then (
+    pushBack(vertexIndexList,pt3);
+    if (pt3.Points)#0 < (a.Points)#0 then (
         c=b; b=a; a=pt3;
     ) else if pt3.Points#0<b.Points#0 then (
         c=b; b=pt3;
@@ -130,7 +155,7 @@ initializeLevelZero(LevelList, MutableList, VertexTriangleContainment):=(level, 
     );
     
     pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
-    vertexIndexList#5=pt4;
+    pushBack(vertexIndexList, pt4);
     if pt4.Points#0 < c.Points#0 then (
         d=c;
         if pt4.Points#0<b.Points#0 then (
@@ -166,25 +191,29 @@ initializeLevelZero(LevelList, MutableList, VertexTriangleContainment):=(level, 
     t8:=new Triangle from {Vertices=> {topPT, d, a}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>7};
     
     --associate triangles to vertices by inclusion
-    --is basepoint
-    vertexTC#0=new MutableHashTable from {Triangles=> new MutableList from {t1,t2,t3,t4}, Levels=>new MutableList from {0,0,0,0}, Indices=>new MutableList from{0,1,2,3}};
+    for i in 0..7 do (pushBack(vertexTC, new cppVector from {theCnts=> new MutableList from {}, theLength=> 0}));
     
-    --is top point
-    vertexTC#1=new MutableHashTable from {Triangles=> new MutableList from {t5,t6,t7,t8}, Levels=>new MutableList from {0,0,0,0}, Indices=>new MutableList from{4,5,6,7}};
+    pushBack((vertexTC@0), t1);
+    pushBack((vertexTC@0), t2);
+    pushBack((vertexTC@0), t3);
+    pushBack((vertexTC@0), t4);    
+    
+    pushBack((vertexTC@1), t5);
+    pushBack((vertexTC@1), t6);
+    pushBack((vertexTC@1), t7);
+    pushBack((vertexTC@1), t8);
     
     --VERY MUCH NEED TO CHECK IN ON LATER
     --I supposed we can do triangle containment for the other points when we actually jump to that point
     
     
     --these 8 triangles make up the level 0 triangulation
-    level#0={t1, t2, t3, t4, t5, t6, t7, t8};
-   
-    -- creates empty rows of garbage values to ensure when O(numLevel) search for triangle containment occurs,
-      --one can actually traverse down correctly
-      --(i.e., index of lower faces do not change when other faces of same level are created
-    for i from 1 to maxLevel do (
-        level#i=new MutableList from (8*4^i:null); --there is a maximum of 8(4^i) triangles at each level
-    );
+    triangleList={t1, t2, t3, t4, t5, t6, t7, t8};
+    
+    --pushBack(vertexIndexList, a);
+    --pushBack(vertexIndexList, b);
+    --pushBack(vertexIndexList, c);
+    --pushBack(vertexIndexList, d);
     
 };
 
@@ -208,34 +237,51 @@ createLowerTriangle=(levelNum, triangleNum)->{
     
 };
 
---need something to update triangles that the point is in
+--CHECK: need something to update triangles that the point is in
 
 
-maxLevel=3;
-assert(maxLevel>0);
 
 
---level=new LevelList from {Indices => new MutableHashTable from {} };
-level=new LevelList from {0..maxLevel};
-vertexIndexList=new MutableList from {0..5}; --is list of vertices
+triangleList=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
+vertexIndexList=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; --is list of vertices
+
 --vertex triangle containment list
 --index of vertex from above corr to partial list of triangles that the vertex lies in
-vertexTC=new VertexTriangleContainment from {}; 
-
-time initializeLevelZero(level, vertexIndexList, vertexTC)
-
-for i in 0..maxLevel do print peek level#i
-
-for x in vertexIndexList do print peek x
-
-for i in 0..1 do(
-    for j in 0..3 do (
-        print peek (vertexTC#i.Triangles)#j.Vertices
-    );
-);
+vertexTC=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
 
 
 
 
+
+time initializeLevelZero(triangleList, vertexIndexList, vertexTC)
+
+for i in 0..(triangleList.theLength-1) do print peek triangleList@i
+
+for x in vertexIndexList.theCnts do print peek x
+
+--NOW SHOULD check vertexTC, this is really important!!
+
+-*
+func1=()->{
+b=new cppVector from {theCnts=>new MutableList, theLength=>0};
+for i in 0..10 do( pushBack(b, {i}); );
+--print peek b.theCnts;
+--print peek b.theLength;
+};
+
+func2=()->{
+c=new MutableList from (1000:null);
+for i in 0..1024 do (c#i={i});
+};
+
+func3=(b)->{ for i in 0..1023 do( pushBack(b, {i}); );};
+
+time func1();
+time func2();
+c=new cppVector from {theCnts=>new MutableList, theLength=>0};
+print peek c;
+time func3(c);
+print peek c;
+*-
 
 
