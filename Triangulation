@@ -1,7 +1,15 @@
-Triangle=new Type of List;
+
+
+--contains list of vertices, ''pointers'' to triangles in it
+--.Vertices is list of vertices 
+--AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
+--SHOULD THIS ALSO CONTAIN ITS OWN INDEX?? I THINK YES, since 
+Triangle=new Type of MutableHashTable;
+
+
 LevelList=new Type of MutableList;
 --SingleLevel=new Type of MutableHashTable;
-VertexTriangleContanment= new Type of MutableHashTable;
+VertexTriangleContainment= new Type of MutableHashTable;
 Vertex=new Type of MutableHashTable;
 
 --would be much more memory efficient FINISH HERE
@@ -94,7 +102,7 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
 --E: returns mutable list of levels (a list of list of triangles), list of vertices, and
      --hashtable w/ key =index of vertice from the list, value= triangles the vertex lies in
 initializeLevelZero=method();
-initializeLevelZero(LevelList, MutableList, VertexTriangleContanment):=(level, vertexIndexList, vertexTC)->{
+initializeLevelZero(LevelList, MutableList, VertexTriangleContainment):=(level, vertexIndexList, vertexTC)->{
     basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true};
     vertexIndexList#0=basePT;
     
@@ -148,14 +156,14 @@ initializeLevelZero(LevelList, MutableList, VertexTriangleContanment):=(level, v
     --sorts these points so that their projection bounds a regular (non self intersecting polygon)
     {a,b,c,d}=sortSquare(a,b,c,d);
     
-    t1:=new Triangle from {basePT, a, b};
-    t2:=new Triangle from {basePT, b, c};
-    t3:=new Triangle from {basePT, c, d};
-    t4:=new Triangle from {basePT, d, a};
-    t5:=new Triangle from {topPT, a, b};
-    t6:=new Triangle from {topPT, b, c};
-    t7:=new Triangle from {topPT, c, d};
-    t8:=new Triangle from {topPT, d, a};
+    t1:=new Triangle from {Vertices=> {basePT, a, b}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>0};
+    t2:=new Triangle from {Vertices=> {basePT, b, c}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>1};
+    t3:=new Triangle from {Vertices=> {basePT, c, d}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>2};
+    t4:=new Triangle from {Vertices=> {basePT, d, a}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>3};
+    t5:=new Triangle from {Vertices=> {topPT, a, b}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>4};
+    t6:=new Triangle from {Vertices=> {topPT, b, c}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>5};
+    t7:=new Triangle from {Vertices=> {topPT, c, d}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>6};
+    t8:=new Triangle from {Vertices=> {topPT, d, a}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>7};
     
     --associate triangles to vertices by inclusion
     --is basepoint
@@ -212,7 +220,7 @@ level=new LevelList from {0..maxLevel};
 vertexIndexList=new MutableList from {0..5}; --is list of vertices
 --vertex triangle containment list
 --index of vertex from above corr to partial list of triangles that the vertex lies in
-vertexTC=new VertexTriangleContanment from {}; 
+vertexTC=new VertexTriangleContainment from {}; 
 
 time initializeLevelZero(level, vertexIndexList, vertexTC)
 
@@ -222,7 +230,7 @@ for x in vertexIndexList do print peek x
 
 for i in 0..1 do(
     for j in 0..3 do (
-        print peek (vertexTC#i.Triangles)#j
+        print peek (vertexTC#i.Triangles)#j.Vertices
     );
 );
 
