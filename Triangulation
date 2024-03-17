@@ -51,13 +51,23 @@ randomS2point=()->{
     return {a*d, b*d, c*d};
 };
 
---returns midpoint of two vertices
---NOT NORMALIZED!
+--returns valid vertex that is midpoint of two vertices
+--is normalized
 Vertex + Vertex:=(x,y)-> new Vertex from {
-    Points=>{0.5*(x.Points#0+y.Points#0), 0.5*(x.Points#1+y.Points#1), 0.5*(x.Points#2+y.Points#2)},
+    Points=>doMidpointCalc(x.Points#0,x.Points#1,x.Points#2,y.Points#0,y.Points#1,y.Points#2),
     valid=>true
 };
 
+--R: list of 6 real numbers, in order of first triangle xyz, second triangle xyz
+--M: none
+--E: returns triple of xyz that represents midpoint between them, but raised to be on unit sphere in R^3
+doMidpointCalc=(x0,x1,x2,y0,y1,y2)->{
+    x:=0.5*(x0+y0);
+    y:=0.5*(x1+y1);
+    z:=0.5*(x2+y2);
+    d:=1.0/sqrt(x*x+y*y+z*z);
+    return {x*d, y*d, z*d};
+};
 
 --projects them down to xy axis, returns them in order so that they bound a regular polygon
   --i.e., the polygon does not intersect itself
@@ -219,28 +229,59 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
 };
 
 --
---R: Levels#levelNum#triangleNum is the face to be midpointed
---M: 
---E:
-createLowerTriangle=(levelNum, triangleNum)->{
+--R: triangleList@index is the triangle to be midpointed, that has NOT already been midpointed
+--M: triangleList (adds in 4 new triangles), vertexIndexList (adds in 4 new vertexes)
+   --: and triangle that's been midpointed (adds in pointers to children)
+--E: midpoints the given triangle, adding the 4 news ones to triangleList
+createLowerTriangle=method();
+createLowerTriangle(ZZ):=(i)->{
+    assert((triangleList@i).AT==null);
+    
     --get vertices of the triangle
-    a:=level#triangleNum#0;
-    b:=level#triangleNum#1;
-    c:=level#triangleNum#2;
+    a:=(triangleList@i).Vertices#0;
+    b:=(triangleList@i).Vertices#1;
+    c:=(triangleList@i).Vertices#2;
     
     --new* is labeled as opposite from vertex *
     newA:=b+c;
     newB:=a+c;
     newC:=a+b;
     
-    --NEED TO NORMALIZE THE POINTS (so that they actually lie on the sphere)
+    --adds these new vertices to the index list
+    pushBack(vertexIndexList, newA);
+    pushBack(vertexIndexList, newB);
+    pushBack(vertexIndexList, newC);
     
     
+    --creates new triangles and adds them to the triangeList
+    lastEntry=triangleList.theLength;
+    
+    t1:= new Triangle from {Vertices=> {a, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+1};
+    t2:= new Triangle from {Vertices=> {b, newB, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+2};
+    t3:= new Triangle from {Vertices=> {c, newC, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+3};
+    t4:= new Triangle from {Vertices=> {newA, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+4};
+    
+    pushBack(triangleList, t1);
+    pushBack(triangleList, t2);
+    pushBack(triangleList, t3);
+    pushBack(triangleList, t4);
+    
+    --links ''children'' triangles to ''parent'' triangle
+    (triangleList@i).AT=t1;
+    (triangleList@i).BT=t2;
+    (triangleList@i).CT=t3;
+    (triangleList@i).nT=t4;
 };
 
+
 --CHECK: need something to update triangles that the point is in
-
-
+--R:
+--M:
+--E:
+getNextPt=()->{
+  
+  
+};
 
 
 triangleList=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
