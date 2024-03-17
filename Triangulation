@@ -4,6 +4,7 @@ LevelList=new Type of MutableList;
 VertexTriangleContanment= new Type of MutableHashTable;
 Vertex=new Type of MutableHashTable;
 
+--would be much more memory efficient FINISH HERE
 
 --R: nothing
 --M: nothing
@@ -16,6 +17,15 @@ randomS2point=()->{
     d:=1.0/sqrt(a*a+b*b+c*c);
     return {a*d, b*d, c*d};
 };
+
+--returns midpoint of two vertices
+--NOT NORMALIZED!
+Vertex + Vertex:=(x,y)-> new Vertex from {
+    Points=>{0.5*(x.Points#0+y.Points#0), 0.5*(x.Points#1+y.Points#1), 0.5*(x.Points#2+y.Points#2)},
+    valid=>true
+};
+
+
 
 --projects them down to xy axis, returns them in order so that they bound a regular polygon
   --i.e., the polygon does not intersect itself
@@ -171,10 +181,21 @@ initializeLevelZero(LevelList, MutableList, VertexTriangleContanment):=(level, v
 };
 
 --
---R: Levels#level#numTriangle is the face to be midpointed
+--R: Levels#levelNum#triangleNum is the face to be midpointed
 --M: 
 --E:
-createLowerTriangle=(level, numTriangle)->{
+createLowerTriangle=(levelNum, triangleNum)->{
+    --get vertices of the triangle
+    a:=level#triangleNum#0;
+    b:=level#triangleNum#1;
+    c:=level#triangleNum#2;
+    
+    --new* is labeled as opposite from vertex *
+    newA:=b+c;
+    newB:=a+c;
+    newC:=a+b;
+    
+    --NEED TO NORMALIZE THE POINTS (so that they actually lie on the sphere)
     
     
 };
@@ -199,7 +220,13 @@ for i in 0..maxLevel do print peek level#i
 
 for x in vertexIndexList do print peek x
 
-for i in 0..1 do print peek vertexTC#i.Triangles
+for i in 0..1 do(
+    for j in 0..3 do (
+        print peek (vertexTC#i.Triangles)#j
+    );
+);
+
+
 
 
 
