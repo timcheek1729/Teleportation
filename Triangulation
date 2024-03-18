@@ -3,14 +3,15 @@
 --contains list of vertices, ''pointers'' to triangles in it
 --.Vertices is list of vertices 
 --AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
---SHOULD THIS ALSO CONTAIN ITS OWN INDEX?? I THINK YES, since 
 Triangle=new Type of MutableHashTable;
 
---contains a triple (which is its xyz coordinates), as well as a ''valid'' boolaean (to denote if thrown out or not)
+--contains a triple (which is its xyz coordinates), as well as a ''valid'' boolean (to denote if thrown out or not)
+--now also cobtain their index
 Vertex=new Type of MutableHashTable;
 
 --Macualay2 doesn't have amortizes O(1) push back, so I implement it myself *sigh*
 --contains .theLength for USED length, and .theCnts for its contents
+--used @ instead of [], _, or # to grab its elements
 cppVector=new Type of MutableHashTable;
 
 --R: a cppVector arr and any element x
@@ -51,11 +52,12 @@ randomS2point=()->{
     return {a*d, b*d, c*d};
 };
 
---returns valid vertex that is midpoint of two vertices
+--returns valid vertex that is midpoint of two vertices, with NULL index
 --is normalized
 Vertex + Vertex:=(x,y)-> new Vertex from {
     Points=>doMidpointCalc(x.Points#0,x.Points#1,x.Points#2,y.Points#0,y.Points#1,y.Points#2),
-    valid=>true
+    valid=>true, 
+    Index=>null
 };
 
 --R: list of 6 real numbers, in order of first triangle xyz, second triangle xyz
@@ -137,49 +139,49 @@ sortSquare(Vertex, Vertex, Vertex, Vertex):=(a,b,c,d)->{
      --hashtable w/ key =index of vertice from the list, value= triangles the vertex lies in
 initializeLevelZero=method();
 initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndexList, vertexTC)->{
-    basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true};
+    basePT:= new Vertex from {Points=> {0,0,-1} , valid=> true, Index=>0};
     pushBack(vertexIndexList,basePT);
     
-    topPT:= new Vertex from {Points=> {0,0,1}, valid=> true}; 
+    topPT:= new Vertex from {Points=> {0,0,1}, valid=> true, Index=>1}; 
     pushBack(vertexIndexList, topPT);
     
     a;b;c;d;
     --other 4 points which make up our initial triangulation
-    pt1:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    pt1:=new Vertex from {Points=> randomS2point(), valid=> true, Index=>2}; 
     pushBack(vertexIndexList, pt1);
     
-    pt2:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    pt2:=new Vertex from {Points=> randomS2point(), valid=> true, Index=>3}; 
     pushBack(vertexIndexList, pt2);
     
     --projecting down to xy-axis, have a be the left point and b be the right point
-    if (pt1.Points)#0 < (pt2.Points)#0 then (a=2; b=3;) else (a=3; b=2;);
+    if (pt1.Points)#0 < (pt2.Points)#0 then (a=pt1.Index; b=pt2.Index;) else (a=pt2.Index; b=pt1.Index;);
     
-    pt3:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    pt3:=new Vertex from {Points=> randomS2point(), valid=> true, Index=>4}; 
     pushBack(vertexIndexList,pt3);
     if (pt3.Points)#0 < ((vertexIndexList@a).Points)#0 then (
-        c=b; b=a; a=4;
+        c=b; b=a; a=pt3.Index;
     ) else if pt3.Points#0<((vertexIndexList@b).Points)#0 then (
         c=b; b=4;
     ) else (
        c=4;
     );
     
-    pt4:=new Vertex from {Points=> randomS2point(), valid=> true}; 
+    pt4:=new Vertex from {Points=> randomS2point(), valid=> true, Index=>5}; 
     pushBack(vertexIndexList, pt4);
     if pt4.Points#0 < ((vertexIndexList@c).Points)#0 then (
         d=c;
         if pt4.Points#0< ((vertexIndexList@b).Points)#0 then (
             c=b;
             if pt4.Points#0< ((vertexIndexList@a).Points)#0 then (
-                b=a; a=5;
+                b=a; a=pt4.Index;
             ) else (
-                b=5;
+                b=pt4.Index;
             );
         ) else (
-            c=5;
+            c=pt4.Index;
         );
     ) else (--is NOT left of c, so is right of c
-      d=5;
+      d=pt4.Index;
     );
     --now a,b,c,d are points sorted by their x coordinates
     
@@ -212,10 +214,8 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
     pushBack((vertexTC@1), t6);
     pushBack((vertexTC@1), t7);
     pushBack((vertexTC@1), t8);
-    
-    --VERY MUCH NEED TO CHECK IN ON LATER
-    --I supposed we can do triangle containment for the other points when we actually jump to that point
-    
+    --is very much a partial list of triangle containment
+    --point is that we should only dynamically check where a point is, if we actually need to jump from that point
     
     --these 8 triangles make up the level 0 triangulation
     pushBack(triangleList, t1);
@@ -247,6 +247,11 @@ createLowerTriangle(ZZ):=(i)->{
     newB:=a+c;
     newC:=a+b;
     
+    curIndex=vertexIndexList.theLength;
+    newA.Index=curIndex;
+    newB.Index=curIndex+1;
+    newC.Index=curIndex+2;
+    
     --adds these new vertices to the index list
     pushBack(vertexIndexList, newA);
     pushBack(vertexIndexList, newB);
@@ -256,6 +261,7 @@ createLowerTriangle(ZZ):=(i)->{
     --creates new triangles and adds them to the triangeList
     lastEntry=triangleList.theLength;
     
+    --order is VERY IMPORTANT of how vertices get added in below
     --FIXED index issue below (next entry gets put in at lastEntry index, NOT lastEntry+1)
     t1:= new Triangle from {Vertices=> {a, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry};
     t2:= new Triangle from {Vertices=> {b, newB, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+1};
@@ -277,10 +283,13 @@ createLowerTriangle(ZZ):=(i)->{
 
 
 --CHECK: need something to update triangles that the point is in
---R: i is index of point in vertexIndexList, j is index of triangle in vertexTC
+--R: i is index of point in vertexIndexList, j is index of triangle in triangleList
 --M: adds smaller triangles to vertexTC@i
 --E: updates vertexTC with up to numLevel-many triangles
 --does like a DPS search but stops when hits a child node, returns index of that triangle
+--point is to have O(numLevel) lookup once, and then O(1) afterward (until next triangulation)
+  --will be iterating packwards through triangleTC at a given point, to find next point to (try to) jump to
+  --smallest triangles will niavely be added at the back of the list
 getNextPt=method();
 getNextPt(ZZ,ZZ):=(i,j)->{
     if class((triangleList@j).AT) === class(null) then return j;
@@ -315,6 +324,13 @@ getNextPt(ZZ,ZZ):=(i,j)->{
   return j;
 };
 --print getNextPt(0,0);
+-*
+peek (vertexIndexList@3)--for test case to work well, need to be in whatever you just triangulated 
+peek (triangleList@0).Vertices
+pushBack((vertexTC@3), (triangleList@0))
+print getNextPt(3,0);--CHECK this last vertex
+
+*-
 
 
 triangleList=new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
@@ -337,9 +353,16 @@ for x in vertexIndexList.theCnts do print peek x
 --just gives how many triangles are associated with each index
 for x in (vertexTC.theCnts) do print peek x.theCnts
 
-for x in (vertexTC.theCnts) do(for y in x.theCnts do( print peek y.Vertices;);  print("-----"); );
-
-
+for x in (vertexTC.theCnts) do(
+    --if class(x)===class(null) then skip;
+    for y in x.theCnts do(
+        if class(y)===class(null) then  (skip;
+        ) else (
+             print peek y.Vertices;
+        );
+    );  
+    print("-----");
+);
 
 -*
 func1=()->{
