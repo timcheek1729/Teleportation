@@ -828,18 +828,21 @@ getNextPt(ZZ,ZZ):=(i,j)->{
 
 --R: a polySystem F in \C[\vec{p}][\vec{x}], with start portal p0 and target portals p1, both lists
 --M: none
---E: returns a polySystem in \C[t][\vec{x}], paameterized at t*p0+(1-t)*p1
+--E: returns a polySystem in \C[t,s][\vec{x}], paameterized at t*p0+(s)*p1
+--formally treat s as 1/t (since m2 has not implemented fraction fields)
 
 parametrizeFamily=(F, p0, p1)->{
 
-    listOfVariables=gens(ring(F));
-    listOfParams=parameters(F);
-    combinedListOfVariables=append(listOfVariables, "t"); 
-    everythingList=join(listOfParams, combinedListOfVariables);
-    everythingRing=CC[everythingList];
+    listOfVariables:=gens(ring(F));
+    listOfParams:=parameters(F);
+    combinedListOfVariables:=append(listOfVariables, "t"); 
+    combinedListOfVariables=append(combinedListOfVariables, "s"); 
+    everythingList:=join(listOfParams, combinedListOfVariables);
+    everythingRing:=CC[everythingList];
     use everythingRing;
-   
+    print everythingRing;
     tempF=sub(F, everythingRing);
+    print peek tempF;
    
     --now, create the actual parametrization
     
@@ -849,15 +852,18 @@ parametrizeFamily=(F, p0, p1)->{
     for gen in gens(everythingRing) do (
         if count< #listOfParams then (
             for k from 0 to #newPolyList-1 do (
-                newPolyList#k = sub(newPolyList#k, {gen => (t)*(p0_count)+(1-t)*(p1_count)});
+                --want to say that I can just substitute 1-t with 1/t???
+                --CHECK!! might actually have current setup go from t=1 to t=0, so then need to make changes
+                --I guess that upon evaluation, we need to formally treat s as 1/t, since field of fractions hasn't been implemented
+                newPolyList#k = sub(newPolyList#k, {gen => (t)*(p0_count)+(s)*(p1_count)});
             
             );
              count=count+1;
         );
     );
 
-    spec=polySystem(toList(newPolyList));
-    spec=sub(spec, CC[t][listOfVariables]);
+    spec:=polySystem(toList(newPolyList));
+    spec=sub(spec, CC[t,s][listOfVariables]);
 
     return polySystem(spec);
 };
@@ -896,6 +902,7 @@ getRandomListOfPortals=(n)->{
 
 initializeDataStructs=(F, x0, t0)->{
 
+    --deal with global mega portals
     megaLOP={t0};
     --start from 2 b/c initial portal is the first one
     for indexer from 2 to numMega do (
@@ -908,24 +915,42 @@ initializeDataStructs=(F, x0, t0)->{
         megaSols#i=set {}; --initial empty set
     );
     
-    --for valid entries of the table, is a list of portals corresponding to that "edge" (complex line)
-    tableLOP=table(numMega, numMega, (i,j)->
+    
+    --below has been changed since last algorithm
+    
+    tableTriangleList=table(numMega, numMega, (i,j)->
         (if i<j then (
-            return getRandomListOfPortals(numMini);
+            return new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
+        ) else (
+            return 0;
+        );)
+    );
+    
+
+    tableVertexIndexList=table(numMega, numMega, (i,j)->
+        (if i<j then (
+            return new cppVector from {theCnts=>new MutableList from {}, theLength=>0};
         ) else (
             return 0;
         );)
     );
 
-    --have to make everything mutable to throw out "bad" portals
-    tableLOP=new MutableList from tableLOP;
-    for k from 0 to numMega-1 do tableLOP#k=new MutableList from tableLOP#k;
-    for i from 0 to numMega-1 do for j from 0 to numMega-1 do(
-        if i<j then (
-            (tableLOP#i)#j =new MutableList from (tableLOP#i)#j;
+    tableVertexTC=table(numMega, numMega, (i,j)->
+        (if i<j then (
+            return new cppVector from {theCnts=>new MutableList from {}, theLength=>0}; 
+        ) else (
+            return 0;
+        );)
+    );
+
+    for i in 0..(numMega-1) do(
+        for j in 0..(numMega-1) do (
+            if i<j then initializeLevelZero(tableTriangleList#i#j, tableVertexIndexList#i#j, tableVertexTC#i#j );--okay, so
         );
     );
 
+    --above has been changed since last algorithm
+ 
     --for valid entries of the table, is a solutions hashTable corresponding to that "edge" (complex line)
     --for edges connecting to base portal, already have one solution to that system, so is added
     tableSols=table(numMega, numMega, (i,j)->
@@ -1095,8 +1120,9 @@ solveAll=(F, x0, t0)->{
     return megaSols#0;
     
 };
-tableLOP=table;
-tableSols=table;
+tableTriangleList=table;
+tableVertexIndexList=table;
+tableVertexTC=table;
 megaLOP={};
 megaSols=new MutableHashTable;
 parametrizations=table;
@@ -1145,7 +1171,7 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=false;
+verbose=true;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
@@ -1197,25 +1223,24 @@ polys = parametrizedCyclic 3;
 
 --time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 
-param=(#(parameters(polys))-1:1);
-param=toList(append(param, -1));
+--param=(#(parameters(polys))-1:1);
+--param=toList(append(param, -1));
 
-oneSol=findSeed(polys, param);
-time mo=solveAll(polys, oneSol, param);
+--oneSol=findSeed(polys, param);
+--time mo=solveAll(polys, oneSol, param);
 print length(toList(mo));
 print peek megaSols;
 
 
 
--*
+
 R=CC[p][x];
 f=(x^3-3*x-p);
 x0={0};
 t0={0};
-mo=solveAll(polySystem{f}, x0, t0);
+time mo=solveAll(polySystem{f}, x0, t0);
 print peek megaSols;
 
-*-
 
 -*
 needsPackage "PHCpack";
