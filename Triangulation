@@ -283,20 +283,29 @@ createLowerTriangle(ZZ):=(i)->{
 
 
 --CHECK: need something to update triangles that the point is in
+--UPDATE (as in, has already been updated): adds in modified vertexTC if it is empty
+  --: also, if not empty, adds in smallest triangle point is in (which includes overriding parent triangle)
 --R: i is index of point in vertexIndexList, j is index of triangle in triangleList
 --M: adds smaller triangles to vertexTC@i
---E: updates vertexTC with up to numLevel-many triangles
+--E: updates vertexTC with up to numLevel-many triangles EDIT: only adds in smallest one now
 --does like a DPS search but stops when hits a child node, returns index of that triangle
 --point is to have O(numLevel) lookup once, and then O(1) afterward (until next triangulation)
   --will be iterating packwards through triangleTC at a given point, to find next point to (try to) jump to
   --smallest triangles will niavely be added at the back of the list
 getNextPt=method();
 getNextPt(ZZ,ZZ):=(i,j)->{
+    --if this vertex is not yet known to be part of any triangle, push this triangle that it's a part of
+    if (vertexTC@i).theLength==0 then pushBack((vertexTC@i), (triangleList@j));
+    
+    --as a bug check, make sure that vertex is actually in this triangle
+    assert( (((triangleList@j).Vertices)#0).Index ==i or (((triangleList@j).Vertices)#1).Index ==i or (((triangleList@j).Vertices)#2).Index ==i);
+    
+    --if this triangle has no children, then we're done
     if class((triangleList@j).AT) === class(null) then return j;
+    initialJ:=j;
     
     --observation to be made is that given a point in a triangulation,
     --there's only on possible triangle (AT, BT, CT) this point can EVER be in, in the sucessive triangulations
-  
     orient:=null;
     if (triangleList@j).Vertices#0 === vertexIndexList@i then (orient=1;
     ) else if (triangleList@j).Vertices#1 === vertexIndexList@i then (orient=2;
@@ -309,25 +318,38 @@ getNextPt(ZZ,ZZ):=(i,j)->{
         assert(false);
     );
     
+  --should be vertexTC@i, NOT vertexTC@0, right???
   while not(class((triangleList@j).AT) === class(null)) do(
       if orient==1 then (
-         pushBack((vertexTC@0), (triangleList@j).AT);
+         --pushBack((vertexTC@i), (triangleList@j).AT);
          j=((triangleList@j).AT).Index;
       ) else if orient ==2 then (
-         pushBack((vertexTC@0), (triangleList@j).BT);
+         --pushBack((vertexTC@i), (triangleList@j).BT);
          j=((triangleList@j).BT).Index;
       ) else (
-         pushBack((vertexTC@0), (triangleList@j).CT);
+         --pushBack((vertexTC@i), (triangleList@j).CT);
          j=((triangleList@j).CT).Index;
       );
   );
+  
+  --overrides parent if applicable, otherwise pushes smallest triangle point is in
+  indexOfLastPushBack:= ((vertexTC@i).theLength)-1;
+  if ((vertexTC@i)@(indexOfLastPushBack)).Index ==initialJ then (
+      --has been checked, and works as it should, i.e., does NOT override the underlying class object
+      ((vertexTC@i).theCnts)#indexOfLastPushBack= triangleList@j;
+  ) else (
+      pushBack((vertexTC@i), (triangleList@j));
+  );
+  
+  
+  assert( (((triangleList@j).Vertices)#0).Index ==i or (((triangleList@j).Vertices)#1).Index ==i or (((triangleList@j).Vertices)#2).Index ==i);
   return j;
 };
 --print getNextPt(0,0);
 -*
 peek (vertexIndexList@3)--for test case to work well, need to be in whatever you just triangulated 
 peek (triangleList@0).Vertices
-pushBack((vertexTC@3), (triangleList@0))
+pushBack((vertexTC@3), (triangleList@0))--THIS IS NO LONGER NEEDED, as getNextPt updates vertexTC even if it starts empty
 print getNextPt(3,0);--CHECK this last vertex
 
 *-
@@ -386,5 +408,3 @@ print peek c;
 time func3(c);
 print peek c;
 *-
-
-
