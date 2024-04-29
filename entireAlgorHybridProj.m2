@@ -275,21 +275,28 @@ getPSApprox=(F, t0, sol, ord)->{
 --E: returns an L/M Pade approximation that approximates F near (xi,ti)
 --NOTE: FINISH HERE: assumes that (z:1)\mapsto z and sigma_(0:1)\comp \psi: CP\ra C coincide (or are close)
 
-getApprox=(F, xi, i, ti)->{
+getApprox:=(F, xi, i, ti)->{
     m:=max(abs(ti),1);
-    ti:=ti/m; 
-    one:=1/m;
+    ti= ti/m; 
+    one:= 1/m;
     if one != 1 then assert(false);
     --given the values getC returns, I am skeptical this actually ever does anything
     
+    print ("this is F", peek F);
+    
     newF:={};
-    t:=(parameters(F))_0;
+    --t:=(parameters(F))_0;--don't think I need this here anymore
     for func in entries(F.PolyMap) do (
         --just subs in t+t0 in for t
         --newF=append(newF, sub((func_0), {((parameters(F))_0) => (((parameters(F))_0)+t0)}));
         --CHECK HERE: am NOT doing any reshifting of t are anything, which I did before
+        --SOLVED: I actually am reshifting t, it is just that this is happenind (as before) in the getPSApprox function
         newF=append(newF, sub((func_0), {s=>one}));
     );
+
+    print ("this is newF", peek newF);
+    print (class(newF));
+    --FINISH HERE: WHY IS THERE NO t HERE???
     newF:=polySystem(newF);
     
     --scaling should NOT change solution set, since are multiplying through by the scalar 1/m
@@ -928,6 +935,10 @@ getNextPt:=(indexP, i, j)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 
 parametrizeFamily=(F, p0, p1)->{
+    --FINISH HERE: need to switch to a sF_p0+tF_p1=0, rather than a F_{sp_0+tp_1}
+    --CHECK: t,s are actually in the right order
+    print(peek p0);
+    print(peek p1);
 
     listOfVariables:=gens(ring(F));
     listOfParams:=parameters(F);
@@ -936,9 +947,9 @@ parametrizeFamily=(F, p0, p1)->{
     everythingList:=join(listOfParams, combinedListOfVariables);
     everythingRing:=CC[everythingList];
     use everythingRing;
-    print everythingRing;
+    --print everythingRing;
     tempF=sub(F, everythingRing);
-    print peek tempF;
+    --print peek tempF;
    
     --now, create the actual parametrization
     
@@ -948,11 +959,8 @@ parametrizeFamily=(F, p0, p1)->{
     for gen in gens(everythingRing) do (
         if count< #listOfParams then (
             for k from 0 to #newPolyList-1 do (
-                --want to say that I can just substitute 1-t with 1/t???
-                --CHECK!! might actually have current setup go from t=1 to t=0, so then need to make changes
-                --I guess that upon evaluation, we need to formally treat s as 1/t, since field of fractions hasn't been implemented
-                newPolyList#k = sub(newPolyList#k, {gen => (t)*(p0_count)+(s)*(p1_count)});
-            
+                --print peek newPolyList#k;
+                newPolyList#k = s*(sub(newPolyList#k, {gen=>p0_count}))+t*(sub(newPolyList#k, {gen=>p1_count}));
             );
              count=count+1;
         );
@@ -960,7 +968,7 @@ parametrizeFamily=(F, p0, p1)->{
 
     spec:=polySystem(toList(newPolyList));
     spec=sub(spec, CC[t,s][listOfVariables]);
-
+    --print peek polySystem(spec);
     return polySystem(spec);
 };
 
@@ -1324,8 +1332,10 @@ polys = parametrizedCyclic 3;
 
 --oneSol=findSeed(polys, param);
 --time mo=solveAll(polys, oneSol, param);
-print length(toList(mo));
-print peek megaSols;
+
+
+--print length(toList(mo));
+--print peek megaSols;
 
 
 
@@ -1342,4 +1352,4 @@ print peek megaSols;
 needsPackage "PHCpack";
 print time track(specializeSystem(point{{1,1,1,1,1,1,1,-1}}, polys), specializeSystem(point{{0.1,0.1,0.1,0.1,0.1,0.1,0.1,-0.1}}, polys), {(1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3)))});
 
-*
+*-
