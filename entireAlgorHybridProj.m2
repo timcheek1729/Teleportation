@@ -19,6 +19,20 @@
 needsPackage "NumericalAlgebraicGeometry";
 needsPackage "MonodromySolver";
 
+--contains list of vertices, ''pointers'' to triangles in it
+--.Vertices is list of vertices 
+--AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
+Triangle=new Type of MutableHashTable;
+
+--contains a triple (which is its xyz coordinates), as well as a ''valid'' boolean (to denote if thrown out or not)
+--now also cobtain their index
+Vertex=new Type of MutableHashTable;
+
+--Macualay2 doesn't have amortizes O(1) push back, so I implement it myself *sigh*
+--contains .theLength for USED length, and .theCnts for its contents
+--used @ instead of [], _, or # to grab its elements
+cppVector=new Type of MutableHashTable;
+
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 --BELOW IS A COLLECTION OF ASSORTED METHODS
@@ -60,6 +74,23 @@ getNorm=(list1, list2)->{
         s=s+(realPart(x))^2+(imaginaryPart(x))^2;
     );
     return sqrt(s);
+};
+
+--given a vertex, turns it into a complex number via steroegraph projection sigma_(0:1)
+--potentially just want to store this in its own table? to avoid much repeated computation
+getC=method();
+getC(Vertex):=(v)->{
+    if v.Points == {0,0,1} then (
+        return (1,0);
+    ) else (
+        --steroegraphic projection down to plane tangest to south pth
+        x:= (v.Points)#0;
+        y:= (v.Points)#1;
+        z:= (v.Points)#2;
+        return ((2*x)/ (1-z))+ ((2*y)/(1-z))*ii;
+        --am skeptical that this runs how I want it to in terms of the magnitudes that it generates, FINISH HERE
+        --very much need first coordinate to be greater than 1 at some point
+    );
 };
 
 ------------------------------------------------------------------------------------------------------------------------------------
@@ -153,21 +184,22 @@ convertToPade=(coeffs, m, n)->{
 --E: returns a list of power series for F around t, x
 --:note: the t's that show up in curPower are really t+t0 's
 
+--changed assignments here to be local
 getPSApprox=(F, t0, sol, ord)->{
     --shift PS approx so that family is centered around t0
     --while not stricly necessary, does indeed provide better approximations
-    newF={};
-    t=(parameters(F))_0;
+    newF:={};
+    t:=(parameters(F))_0;
     for func in entries(F.PolyMap) do (
         --just subs in t+t0 in for t
         --newF=append(newF, sub((func_0), {((parameters(F))_0) => (((parameters(F))_0)+t0)}));
         newF=append(newF, sub((func_0), {t=>t+t0}));
     );
-    newF=polySystem(newF);
+    newF:=polySystem(newF);
     
-    curOrd=0;
+    curOrd:=0;
     --to ensure elements of sol lie in CC[t]
-    curPower=apply(sol, i-> i+0*t);    
+    curPower:=apply(sol, i-> i+0*t);    
     
     --run this algo until have a polynomial of degree ord
     while curOrd<ord do(
@@ -241,11 +273,27 @@ getPSApprox=(F, t0, sol, ord)->{
 --R: a portal CC ti=listPortals_i and a solution (list) xi to the system F_xi, F a polySystem
 --M: none
 --E: returns an L/M Pade approximation that approximates F near (xi,ti)
+--NOTE: FINISH HERE: assumes that (z:1)\mapsto z and sigma_(0:1)\comp \psi: CP\ra C coincide (or are close)
 
-getApprox=(F, xi, i, listOfPortals)->{
-    ti = (listOfPortals#i)_CC;
+getApprox=(F, xi, i, ti)->{
+    m:=max(abs(ti),1);
+    ti:=ti/m; 
+    one:=1/m;
+    if one != 1 then assert(false);
+    --given the values getC returns, I am skeptical this actually ever does anything
     
-    psApprox=getPSApprox(F, ti, xi, L+M);
+    newF:={};
+    t:=(parameters(F))_0;
+    for func in entries(F.PolyMap) do (
+        --just subs in t+t0 in for t
+        --newF=append(newF, sub((func_0), {((parameters(F))_0) => (((parameters(F))_0)+t0)}));
+        --CHECK HERE: am NOT doing any reshifting of t are anything, which I did before
+        newF=append(newF, sub((func_0), {s=>one}));
+    );
+    newF:=polySystem(newF);
+    
+    --scaling should NOT change solution set, since are multiplying through by the scalar 1/m
+    psApprox:=getPSApprox(newF, ti, xi, L+M);
     
     --refine the psApproximation, yes indeed does something
     for times from 1 to numGauss do psApprox=getPSApprox(F, ti, psApprox, L+M);
@@ -285,6 +333,7 @@ getApprox=(F, xi, i, listOfPortals)->{
 --R: a function fti approximating around xi0, ti0; and a new parameter value tj=listOfPortals_j; polySystem F
    --ti is a CC, xi is a list
    --index=(a,b) such that listOfPortals=tableLOP_a_b, and (tableSols_(index_0)_(index_1))=portals
+   --NOPE, not i0, j are actual C coords corr points on sphere
 --M: if f approximates F_tj well, then appends Q_tj with new solution to F_tj 
 --E: returns (bool, CC) pair.
     --if f does approximates F_tj well and finds a newSolution, then returns (true, newSolution)
@@ -293,8 +342,10 @@ getApprox=(F, xi, i, listOfPortals)->{
 --note: slight discrepancies between this and what's written in the paper, need to edit
 
 inRGA=(F, fti, i0, j, indexP)-> {
-    tj=((tableLOP#(indexP_0)#(indexP_1))#j)_CC;
-    ti=((tableLOP#(indexP_0)#(indexP_1))#i0)_CC;
+    --tj=tableVertexIndexList#(indexP_0)#(indexP_1))@j;
+    --ti=tableVertexIndexList#(indexP_0)#(indexP_1))@i0;
+    ti:=i0;
+    tj:=j;
     specF=specializeSystem(point{{tj}}, F);
     
     --initGuess=flatten(toList(entries(evaluate(fti,point{{tj}}))));
@@ -332,6 +383,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
     );
 };
 
+
   
 --R: an (xi,listOfPortals_i) solution pair to the family/polySystem F. xi is a list listOfPortals_i is a CC
    --index=(a,b) such that tableLOP_a_b=listOfPortals is the correct list of portals
@@ -341,34 +393,52 @@ inRGA=(F, fti, i0, j, indexP)-> {
     --stopping crit is now reaching "the end of the path"
     --MODIFIED: i.e., not really dfs anymore, since once you at each (sol, t0) pair, you can only jump once now
 --NOTE: indeed checks how far one could jump in theory
+--FINISH HERE: do not ever createLower triangle yet
 
 iterateOnce=(F, xi, i, indexP, endIndex)->{
 
-    --rather than considering all t values at every jump, we eliminate points we already know are "behind" us 
-    iterateOnceHelper=(F, xi, i, indexP, endIndex, listOfIndices, lastIndex)->{
-        --AHHHHH!!! ABSOLUTELY MUST DO := , NOT =
-        --otherwise M2 overwrites g upon each recursive step
-        pades:=getApprox(F, xi,i, tableLOP#(indexP_0)#(indexP_1));
+    iterateOnceHelper=(F, xi, i, indexP, endIndex, curTriangleIndex)->{
+        c:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@i); --is the C coordinate of vertex at indexP
+        
+        pades:=getApprox(F, xi,i, c);
         rad:=getD(pades);
         minD:=B1*rad;
         maxD:=B2*rad;
-
-        distanceToEnd:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex});
         
-        nextList:=new MutableList from (numMini:null);
-        nextLastIndex:=0;
-
-        for temp from 0 to lastIndex-1 do (
-            j=listOfIndices#temp;
-            --so if reachable, would want to jump, so is a candidate
-            if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd then (
-                nextList#nextLastIndex=j;
-                nextLastIndex=nextLastIndex+1;
-                distanceBetween:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
+        --now get next point for here, if it's too big compared to maxD then go over to next triangle
+        --otherwise then triangulate (either triangle we're currently in,
+            --what about triangles that we don't yet know we're in, but are actually in? parent vertex might have more info here on vertexTC
+        --at some point stop triangulating, just homotopy continue over
+        
+        --get distance on z-coords
+        --curDToEnd:= getNorm( {((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2, ((((tableVertexIndexList#(indexP_0)#(indexP_1)))@endIndex).Points)#2} );
+        zCoord:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2;
+        
+        --gets how many triangles this vertex is currently known to be in
+        theIterator:= ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength;
+        --since this vertex is currently in a triangle that we know 
+        if theIterator==0 then (
+            assert(class(curTriangleIndex)!=class(null));--only should be null for north/south pole
+            getNextPT(indexP, i, curTriangleIndex);--adds in current triangle
+            theIterator=1;
+        );
+        
+        while theIterator>0 do (
+            potNextTriangleIndex:=getNextPT((indexP, i, tableVertexTC#(indexP_0)#(indexP_1))@theIterator);
+            potNextTriagle:= (tableTriangleList#(indexP_0)#(indexP_1))@potNextTriangleIndex;
+            
+            for potNextVertex in 0..2 do(
+                potNextPoint:= (potNextTriagle.Points)#potNextVertex;
+                --potDToEnd:=getNorm( {(potNextPoint.Points)#2, ((((tableVertexIndexList#(indexP_0)#(indexP_1)))@endIndex).Points)#2} );
                 
-                --now see if actually reachable
-                if minD<distanceBetween and distanceBetween<maxD then (
-                    potentialZero:=inRGA(F, pades, i, j, indexP);
+                j:=potNextPoint.Index;
+                c2:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@j);
+                z2:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@j).Points)#2;
+                
+                --if closer to desired pole, and within pade range, and is valid
+                if ((endIndex==0 and z1>z2) or (endIndex==1 and z1<z2)) and abs(c-c2)<maxD then (
+                    potentialZero:=inRGA(F, pades, c, c2, indexP);
+                    
                     if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
                     if potentialZero_0 then (
                         --if reached then end, return the new zero that was found
@@ -376,45 +446,22 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 
                         --if found newSol and should keep going, then calls on new solution pair
                         if verbose then print("mini woohoo");
-                        return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, nextList, nextLastIndex);
+                        return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, potNextTriangleIndex);
 
                         --above return: breaks dfs, i.e., only ever jump once for a given (sol, t0) pair
                     );--if
                 );--if
-            );--if
-        );--for
-        
-        start; if lastIndex==0 then start =0 else start=listOfIndices#(lastIndex-1)+1;
-        
-        for j from start to numMini-1 do(
-            if j!=i and getNorm({(tableLOP#(indexP_0)#(indexP_1))#j}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex})<distanceToEnd then (
-                nextList#nextLastIndex=j;
-                nextLastIndex=nextLastIndex+1;
-                distanceBetween:=getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#j});
-
-                if minD<distanceBetween and distanceBetween<maxD then (
-                    potentialZero:=inRGA(F, pades, i, j, indexP);
-                    if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
-                    if potentialZero_0 then (
-                        if j==endIndex then (print("INDEED REACHED END PORTAL"); return potentialZero_1) ;
-                        if verbose then print("mini woohoo");
-                        return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, nextList, nextLastIndex);
-                    );--if
-                    );--if
-            );--if
-        );--for
-        --print((tableLOP#(indexP_0)#(indexP_1))#i, getNorm({(tableLOP#(indexP_0)#(indexP_1))#i}, {(tableLOP#(indexP_0)#(indexP_1))#endIndex}));
-    
-        --so didn't move
-        curT:=(tableLOP#(indexP_0)#(indexP_1))#i;
+                
+            );--for
+            theIterator=theIterator-1;
+        );--while
+ 
         --overwrites t for being bad, now will never jump here, unless is start or end
-        if i!=0 and i!=1 then (tableLOP#(indexP_0)#(indexP_1))#i=-10;
-        return homCtn(F, xi, curT, indexP, endIndex);
-        
-
+        if i!=0 and i!=1 then ((tableVertexIndexList#(indexP_0)#(indexP_1))@i).valid=false;
+        return homCtn(F, xi, i, indexP, endIndex);
     };
 
-    return iterateOnceHelper(F, xi, i, indexP, endIndex, {},0);
+    return iterateOnceHelper(F, xi, i, indexP, endIndex,null);
 };
 
 ------------------------------------------------------------------------------------------------------------------------------------
@@ -423,14 +470,81 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
---homotopy continuation add on:
+--homotopy continuation add on for proj stuff:
 --R: Pade must be implemented (b/c uses a priori step size). Has same requirements as iteranteOnce
-  --: if indexP==(-1,-1), is flag that endIndex is actually goalT
   --:also, F is of the form tA+(1-t)B
 --M: none
 --E: returns solution found at end of hom ctn
 
-homCtn=(F, xi, curT, indexP, endIndex)->{
+homCtn=(F, xi, i, indexP, endIndex)->{
+    --no longer pass in index of curT b/c want to throw that index out for failing
+    --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
+    --print curT;
+    
+    curT:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@i); --is the C coordinate of vertex at indexP
+    curX:=point{xi};
+    
+    --gets argument of curT
+    angle:=atan2(imaginaryPart(curT), realPart(curT)); 
+    curT:=sin(angle)+ii*cos(angle);
+    
+    --so moving up the sphere
+    if endIndex==1 then (
+        while angle-(pi/2)>0.01 do (
+            pades:=getApprox(F, curX.Coordinates,i, curT);
+            rad:=getD(pades);
+            minD:=B3*rad;
+            --print(curT, minD);
+        
+            --minD approximately arc length, and then arc length is equal to angle on unit circle
+            angle=min(pi/2, angle+minD);
+            
+            curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
+            curT=sin(angle)+ii*cos(angle);
+            
+            specF=specializeSystem(point{{curT}}, F);
+            for i from 1 to numNewton do (
+                curX=newton(polySystem(specF),curX);
+            );
+        );
+    --so moving down the sphere
+    ) else (
+        while angle>0.01 do (
+            pades:=getApprox(F, curX.Coordinates,i, curT);
+            rad:=getD(pades);
+            minD:=B3*rad;
+            --print(curT, minD);
+            
+            --minD approximately arc length, and then arc length is equal to angle on unit circle
+            angle=max(0, angle-minD);
+        
+            curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
+            curT=sin(angle)+ii*cos(angle);
+            
+            specF=specializeSystem(point{{curT}}, F);
+            for i from 1 to numNewton do (
+                curX=newton(polySystem(specF),curX);
+            );
+        );
+    );
+
+    timesCor=0;
+    while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
+
+    newSol=rounds(roundTo,curX.Coordinates);
+    (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
+    if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
+    return newSol;
+};
+
+--homotopy continuation add on for find seed ONLY:
+--R: Pade must be implemented (b/c uses a priori step size). Has same requirements as iteranteOnce
+  --: if indexP==(-1,-1), is flag that endIndex is actually goalT (this flag is only used in finding seed)
+  --:also, F is of the form tA+(1-t)B
+--M: none
+--E: returns solution found at end of hom ctn
+
+homCtnfs=(F, xi, curT, indexP, endIndex)->{
     --no longer pass in index of curT b/c want to throw that index out for failing
     --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
     --print curT;
@@ -481,25 +595,12 @@ homCtn=(F, xi, curT, indexP, endIndex)->{
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
 };
+
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 --BELOW IS triangulation stuff
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
---contains list of vertices, ''pointers'' to triangles in it
---.Vertices is list of vertices 
---AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
-Triangle=new Type of MutableHashTable;
-
---contains a triple (which is its xyz coordinates), as well as a ''valid'' boolean (to denote if thrown out or not)
---now also cobtain their index
-Vertex=new Type of MutableHashTable;
-
---Macualay2 doesn't have amortizes O(1) push back, so I implement it myself *sigh*
---contains .theLength for USED length, and .theCnts for its contents
---used @ instead of [], _, or # to grab its elements
-cppVector=new Type of MutableHashTable;
-
 --R: a cppVector arr and any element x
 --M: the cppVector arr, both theCnts and theLength
 --E: in amortized O(1) time, adds in element to end, returns index where element was added
@@ -758,64 +859,64 @@ createLowerTriangle(ZZ):=(i)->{
 --CHECK: need something to update triangles that the point is in
 --UPDATE (as in, has already been updated): adds in modified vertexTC if it is empty
   --: also, if not empty, adds in smallest triangle point is in (which includes overriding parent triangle)
---R: i is index of point in vertexIndexList, j is index of triangle in triangleList
+--R: k gets correct row from table, i is index of point in vertexIndexList, j is index of triangle in triangleList
 --M: adds smaller triangles to vertexTC@i
 --E: updates vertexTC with up to numLevel-many triangles EDIT: only adds in smallest one now
 --does like a DPS search but stops when hits a child node, returns index of that triangle
 --point is to have O(numLevel) lookup once, and then O(1) afterward (until next triangulation)
   --will be iterating packwards through triangleTC at a given point, to find next point to (try to) jump to
   --smallest triangles will niavely be added at the back of the list
-getNextPt=method();
-getNextPt(ZZ,ZZ):=(i,j)->{
+getNextPt:=(indexP, i, j)->{
+--formerly blank, i, j
+--getNextPt(ZZ,ZZ,ZZ):=(a, b, i)->{
     --if this vertex is not yet known to be part of any triangle, push this triangle that it's a part of
-    if (vertexTC@i).theLength==0 then pushBack((vertexTC@i), (triangleList@j));
+    if ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength==0 then pushBack(((tableVertexTC#(indexP_0)#(indexP_1))@i), ((tableTriangleList#(indexP_0)#(indexP_1))@j));
     
     --as a bug check, make sure that vertex is actually in this triangle
-    assert( (((triangleList@j).Vertices)#0).Index ==i or (((triangleList@j).Vertices)#1).Index ==i or (((triangleList@j).Vertices)#2).Index ==i);
+    assert( ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#0).Index ==i or ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#1).Index ==i or ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#2).Index ==i);
     
     --if this triangle has no children, then we're done
-    if class((triangleList@j).AT) === class(null) then return j;
+    if class(((tableTriangleList#(indexP_0)#(indexP_1))@j).AT) === class(null) then return j;
     initialJ:=j;
     
     --observation to be made is that given a point in a triangulation,
     --there's only on possible triangle (AT, BT, CT) this point can EVER be in, in the sucessive triangulations
     orient:=null;
-    if (triangleList@j).Vertices#0 === vertexIndexList@i then (orient=1;
-    ) else if (triangleList@j).Vertices#1 === vertexIndexList@i then (orient=2;
-    ) else if (triangleList@j).Vertices#2 === vertexIndexList@i then (orient=3;
+    if ((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices#0 === (tableVertexIndexList#(indexP_0)#(indexP_1))@i then (orient=1;
+    ) else if ((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices#1 === (tableVertexIndexList#(indexP_0)#(indexP_1))@i then (orient=2;
+    ) else if ((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices#2 === (tableVertexIndexList#(indexP_0)#(indexP_1))@i then (orient=3;
     ) else (
         print("error");
         print(i, j);
-        print("The vertex we are at is", peek (vertexIndexList@i));
-        print("Triangle we're supposed to be in is", peek (triangleList@j).Vertices);
+        print("The vertex we are at is", peek ((tableVertexIndexList#(indexP_0)#(indexP_1))@i));
+        print("Triangle we're supposed to be in is", peek ((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices);
         assert(false);
     );
     
   --should be vertexTC@i, NOT vertexTC@0, right???
-  while not(class((triangleList@j).AT) === class(null)) do(
+  while not(class(((tableTriangleList#(indexP_0)#(indexP_1))@j).AT) === class(null)) do(
       if orient==1 then (
          --pushBack((vertexTC@i), (triangleList@j).AT);
-         j=((triangleList@j).AT).Index;
+         j=(((tableTriangleList#(indexP_0)#(indexP_1))@j).AT).Index;
       ) else if orient ==2 then (
          --pushBack((vertexTC@i), (triangleList@j).BT);
-         j=((triangleList@j).BT).Index;
+         j=(((tableTriangleList#(indexP_0)#(indexP_1))@j).BT).Index;
       ) else (
          --pushBack((vertexTC@i), (triangleList@j).CT);
-         j=((triangleList@j).CT).Index;
+         j=(((tableTriangleList#(indexP_0)#(indexP_1))@j).CT).Index;
       );
   );
-  
+
   --overrides parent if applicable, otherwise pushes smallest triangle point is in
-  indexOfLastPushBack:= ((vertexTC@i).theLength)-1;
-  if ((vertexTC@i)@(indexOfLastPushBack)).Index ==initialJ then (
+  indexOfLastPushBack:= (((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength)-1;
+  if (((tableVertexTC#(indexP_0)#(indexP_1))@i)@(indexOfLastPushBack)).Index ==initialJ then (
       --has been checked, and works as it should, i.e., does NOT override the underlying class object
-      ((vertexTC@i).theCnts)#indexOfLastPushBack= triangleList@j;
+      (((tableVertexTC#(indexP_0)#(indexP_1))@i).theCnts)#indexOfLastPushBack= triangleList@j;
   ) else (
-      pushBack((vertexTC@i), (triangleList@j));
+      pushBack(((tableVertexTC#(indexP_0)#(indexP_1))@i), ((tableTriangleList#(indexP_0)#(indexP_1))@j));
   );
   
-  
-  assert( (((triangleList@j).Vertices)#0).Index ==i or (((triangleList@j).Vertices)#1).Index ==i or (((triangleList@j).Vertices)#2).Index ==i);
+  assert( ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#0).Index ==i or ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#1).Index ==i or ((((tableTriangleList#(indexP_0)#(indexP_1))@j).Vertices)#2).Index ==i);
   return j;
 };
 
@@ -825,11 +926,6 @@ getNextPt(ZZ,ZZ):=(i,j)->{
 --BELOW is initial setup stuff
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
-
---R: a polySystem F in \C[\vec{p}][\vec{x}], with start portal p0 and target portals p1, both lists
---M: none
---E: returns a polySystem in \C[t,s][\vec{x}], paameterized at t*p0+(s)*p1
---formally treat s as 1/t (since m2 has not implemented fraction fields)
 
 parametrizeFamily=(F, p0, p1)->{
 
@@ -1161,7 +1257,7 @@ findSeed=(F, p0)->{
     --now homotopy continuation this solution over to F_p
     reducedF=parametrizeFamily(F, p1.Coordinates, p0);
     
-    return homCtn(reducedF, x0.Coordinates, 1, (-1,-1), 0);
+    return homCtnfs(reducedF, x0.Coordinates, 1, (-1,-1), 0);
 
 };
 
@@ -1246,4 +1342,4 @@ print peek megaSols;
 needsPackage "PHCpack";
 print time track(specializeSystem(point{{1,1,1,1,1,1,1,-1}}, polys), specializeSystem(point{{0.1,0.1,0.1,0.1,0.1,0.1,0.1,-0.1}}, polys), {(1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3)))});
 
-*-
+*
