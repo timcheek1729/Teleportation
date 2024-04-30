@@ -184,7 +184,6 @@ convertToPade=(coeffs, m, n)->{
 --E: returns a list of power series for F around t, x
 --:note: the t's that show up in curPower are really t+t0 's
 
---changed assignments here to be local
 getPSApprox=(F, t0, sol, ord)->{
     --shift PS approx so that family is centered around t0
     --while not stricly necessary, does indeed provide better approximations
@@ -195,11 +194,11 @@ getPSApprox=(F, t0, sol, ord)->{
         --newF=append(newF, sub((func_0), {((parameters(F))_0) => (((parameters(F))_0)+t0)}));
         newF=append(newF, sub((func_0), {t=>t+t0}));
     );
-    newF:=polySystem(newF);
+    newF=polySystem(newF);
     
     curOrd:=0;
     --to ensure elements of sol lie in CC[t]
-    curPower:=apply(sol, i-> i+0*t);    
+    curPower:=apply(sol, i-> i+0*t);
     
     --run this algo until have a polynomial of degree ord
     while curOrd<ord do(
@@ -279,10 +278,8 @@ getApprox:=(F, xi, i, ti)->{
     m:=max(abs(ti),1);
     ti= ti/m; 
     one:= 1/m;
-    if one != 1 then assert(false);
+    if one != 1 then assert(false); --WHY DO I HAVE THIS HERE??
     --given the values getC returns, I am skeptical this actually ever does anything
-    
-    print ("this is F", peek F);
     
     newF:={};
     --t:=(parameters(F))_0;--don't think I need this here anymore
@@ -294,13 +291,12 @@ getApprox:=(F, xi, i, ti)->{
         newF=append(newF, sub((func_0), {s=>one}));
     );
 
-    print ("this is newF", peek newF);
-    print (class(newF));
-    --FINISH HERE: WHY IS THERE NO t HERE???
-    newF:=polySystem(newF);
+    newF=polySystem(newF);
+    --print ("this is newF", peek newF, ring(newF));
     
     --scaling should NOT change solution set, since are multiplying through by the scalar 1/m
     psApprox:=getPSApprox(newF, ti, xi, L+M);
+    use ring(psApprox_0);--CHECK: this is new to avoid errors below! may break something later??
     
     --refine the psApproximation, yes indeed does something
     for times from 1 to numGauss do psApprox=getPSApprox(F, ti, psApprox, L+M);
@@ -322,6 +318,10 @@ getApprox:=(F, xi, i, ti)->{
     temp=1;
     for k from 1 to L+M do temp=temp+t^k;
     psApprox=append(psApprox, temp);
+    
+    --print("here is list of ps approx",psApprox);
+    --for x in psApprox do print hash ring(x);
+    
     coeffMatrix=(coefficients(matrix{psApprox}))_1;
     --coeffMatrix is a matrix whose columns give coefficients of the power series approximations
     --needed to add temp to ensure that zero coefficients show up in the matrix
@@ -419,23 +419,24 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         
         --get distance on z-coords
         --curDToEnd:= getNorm( {((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2, ((((tableVertexIndexList#(indexP_0)#(indexP_1)))@endIndex).Points)#2} );
-        zCoord:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2;
+        z1:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2;
         
         --gets how many triangles this vertex is currently known to be in
-        theIterator:= ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength;
+        theIterator:= ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength -1;
         --since this vertex is currently in a triangle that we know 
-        if theIterator==0 then (
+        if theIterator==-1 then (
             assert(class(curTriangleIndex)!=class(null));--only should be null for north/south pole
             getNextPT(indexP, i, curTriangleIndex);--adds in current triangle
             theIterator=1;
         );
         
         while theIterator>0 do (
-            potNextTriangleIndex:=getNextPT((indexP, i, tableVertexTC#(indexP_0)#(indexP_1))@theIterator);
-            potNextTriagle:= (tableTriangleList#(indexP_0)#(indexP_1))@potNextTriangleIndex;
+            --print peek (((tableVertexTC#(indexP_0)#(indexP_1))@i)@theIterator);
+            potNextTriangleIndex:= getNextPt(indexP, i, (((tableVertexTC#(indexP_0)#(indexP_1))@i)@theIterator).Index );
+            potNextTriangle:= (tableTriangleList#(indexP_0)#(indexP_1))@potNextTriangleIndex;
             
             for potNextVertex in 0..2 do(
-                potNextPoint:= (potNextTriagle.Points)#potNextVertex;
+                potNextPoint:= (potNextTriangle.Vertices)#potNextVertex;
                 --potDToEnd:=getNorm( {(potNextPoint.Points)#2, ((((tableVertexIndexList#(indexP_0)#(indexP_1)))@endIndex).Points)#2} );
                 
                 j:=potNextPoint.Index;
@@ -497,7 +498,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     
     --so moving up the sphere
     if endIndex==1 then (
-        while angle-(pi/2)>0.01 do (
+        while (pi/2)-angle >0.01 do (
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
             minD:=B3*rad;
@@ -509,7 +510,9 @@ homCtn=(F, xi, i, indexP, endIndex)->{
             curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
             curT=sin(angle)+ii*cos(angle);
             
-            specF=specializeSystem(point{{curT}}, F);
+            --print peek F;
+            --print curT;
+            specF=specializeSystem(point{{realPart(curT), imaginaryPart(curT)}}, F);
             for i from 1 to numNewton do (
                 curX=newton(polySystem(specF),curX);
             );
@@ -528,7 +531,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
             curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
             curT=sin(angle)+ii*cos(angle);
             
-            specF=specializeSystem(point{{curT}}, F);
+            specF=specializeSystem(point{{realPart(curT), imaginaryPart(curT)}}, F);
             for i from 1 to numNewton do (
                 curX=newton(polySystem(specF),curX);
             );
@@ -873,7 +876,7 @@ createLowerTriangle(ZZ):=(i)->{
 --point is to have O(numLevel) lookup once, and then O(1) afterward (until next triangulation)
   --will be iterating packwards through triangleTC at a given point, to find next point to (try to) jump to
   --smallest triangles will niavely be added at the back of the list
-getNextPt:=(indexP, i, j)->{
+getNextPt=(indexP, i, j)->{
 --formerly blank, i, j
 --getNextPt(ZZ,ZZ,ZZ):=(a, b, i)->{
     --if this vertex is not yet known to be part of any triangle, push this triangle that it's a part of
@@ -937,8 +940,6 @@ getNextPt:=(indexP, i, j)->{
 parametrizeFamily=(F, p0, p1)->{
     --FINISH HERE: need to switch to a sF_p0+tF_p1=0, rather than a F_{sp_0+tp_1}
     --CHECK: t,s are actually in the right order
-    print(peek p0);
-    print(peek p1);
 
     listOfVariables:=gens(ring(F));
     listOfParams:=parameters(F);
