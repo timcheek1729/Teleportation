@@ -81,7 +81,8 @@ getNorm=(list1, list2)->{
 getC=method();
 getC(Vertex):=(v)->{
     if v.Points == {0,0,1} then (
-        return (1,0);
+        --return (1,0);
+        return ((2*0.1)/ (1-0.99))+ ((2*0.1)/(1-0.99))*ii;
     ) else (
         --steroegraphic projection down to plane tangest to south pth
         x:= (v.Points)#0;
@@ -275,17 +276,21 @@ getPSApprox=(F, t0, sol, ord)->{
 --NOTE: FINISH HERE: assumes that (z:1)\mapsto z and sigma_(0:1)\comp \psi: CP\ra C coincide (or are close)
 
 getApprox:=(F, xi, i, ti)->{
-    m:=max(abs(ti),1);
-    ti= ti/m; 
-    one:= 1/m;
-    if one != 1 then assert(false); --WHY DO I HAVE THIS HERE??
-    --given the values getC returns, I am skeptical this actually ever does anything
+    m;
+    one;
+    --so not at north pole
+    try( m=max(abs(ti),1);
+    ) then (
+        ti= ti/m; 
+        one= 1/m;
+    ) else (
+        ti=1; 
+        one=0;
+    );
     
     newF:={};
     --t:=(parameters(F))_0;--don't think I need this here anymore
     for func in entries(F.PolyMap) do (
-        --just subs in t+t0 in for t
-        --newF=append(newF, sub((func_0), {((parameters(F))_0) => (((parameters(F))_0)+t0)}));
         --CHECK HERE: am NOT doing any reshifting of t are anything, which I did before
         --SOLVED: I actually am reshifting t, it is just that this is happenind (as before) in the getPSApprox function
         newF=append(newF, sub((func_0), {s=>one}));
@@ -498,10 +503,11 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     
     --so moving up the sphere
     if endIndex==1 then (
-        while (pi/2)-angle >0.01 do (
+        while (pi/2)-angle >epsilon do (
+            --print("running homctn step1", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
-            minD:=B3*rad;
+            minD:=max(B3*rad, epsilon/2);
             --print(curT, minD);
         
             --minD approximately arc length, and then arc length is equal to angle on unit circle
@@ -519,10 +525,11 @@ homCtn=(F, xi, i, indexP, endIndex)->{
         );
     --so moving down the sphere
     ) else (
-        while angle>0.01 do (
+        while angle>epsilon do (
+            --print("running homctn step2", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
-            minD:=B3*rad;
+            minD:=max(B3*rad, epsilon/2);
             --print(curT, minD);
             
             --minD approximately arc length, and then arc length is equal to angle on unit circle
@@ -1276,10 +1283,10 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=true;
+verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
-epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga
+epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga (and hom ctn closeness)
 fwdErrB=0.1; --determines max fwdErr
 numMini=100; --number of points to be in complex line rga case
 numMega=3; --number of multiparameter points to sample from
@@ -1289,7 +1296,7 @@ L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
-B3=0.7;--jump size in hom ctn
+B3=2;--jump size in hom ctn
     
 
 -*
@@ -1326,7 +1333,7 @@ parametrizedCyclic = n -> (
 
 polys = parametrizedCyclic 3;
 
---time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 
 --param=(#(parameters(polys))-1:1);
 --param=toList(append(param, -1));
@@ -1335,19 +1342,19 @@ polys = parametrizedCyclic 3;
 --time mo=solveAll(polys, oneSol, param);
 
 
---print length(toList(mo));
---print peek megaSols;
+print length(toList(mo));
+print peek megaSols;
 
 
 
-
+-*
 R=CC[p][x];
 f=(x^3-3*x-p);
 x0={0};
 t0={0};
 time mo=solveAll(polySystem{f}, x0, t0);
 print peek megaSols;
-
+*-
 
 -*
 needsPackage "PHCpack";
