@@ -89,8 +89,23 @@ getC(Vertex):=(v)->{
         x:= (v.Points)#0;
         y:= (v.Points)#1;
         z:= (v.Points)#2;
-        return ((2*x)/ (1-z))+ ((2*y)/(1-z))*ii;
+        return 1/1*(((2*x)/ (1-z))+ ((2*y)/(1-z))*ii);
         --very much need first coordinate to be greater than 1 at some point, which does happen near the top
+    );
+};
+
+--given a list, turns it into a complex number via steroegraph projection sigma_(0:1)
+--potentially just want to store this in its own table? to avoid much repeated computation
+getCList:=(triple)->
+    if triple == {0,0,1} then (
+        --return (1,0);
+        return ((2*0.149)/ (1-0.99))+ ((2*0.005)/(1-0.99))*ii;--is a point near the top
+    ) else (
+        --steroegraphic projection down to plane tangest to south pth
+        x:= (triple)#0;
+        y:= (triple)#1;
+        z:= (triple)#2;
+        return 1/1*(((2*x)/ (1-z))+ ((2*y)/(1-z))*ii);
     );
 };
 
@@ -392,14 +407,12 @@ inRGA=(F, fti, i0, j, indexP)-> {
     initGuess=evaluateAt(fti, ti, tj);
     xj=point{initGuess};
     try(
-        
         for i from 1 to numNewton do (
             xj=newton(polySystem(specF),xj);
             if getNorm(initGuess, xj.Coordinates) >= epsilon then (
                 --print("jump failed--newton bounced");
                 return (false,1);
             );
-        
         );
     ) then (
         --ERROR: sometimes have error here, in that "encounted values for 2 variables, but expected 3". Should be solved now, added ", one"
@@ -504,8 +517,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
             );--for
             --so did not successfully jump to any of the vertices in this triangle, for whatever reason, so we triangulate it here (only effects next run)
             --print("we have created a lower triangle now");
-            createLowerTriangle(indexP, potNextTriangleIndex);
-             
+            if ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength<numMini then createLowerTriangle(indexP, potNextTriangleIndex);
+            
             theIterator=theIterator-1;
         );--while
         
@@ -536,41 +549,60 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     if verbose==true then print("have entered hom ctn, we have that curT is", curT, "curX is ", curX, "and then endIndex is", endIndex);
     
     --gets argument of curT
-    --angle:=atan2(imaginaryPart(curT), realPart(curT)); 
+    xyangle:=atan2(imaginaryPart(curT), realPart(curT)); 
     --NOTE: the arccos function measures the angle DOWN from the z-axis, rather than UP from the plane
-    angle:=(pi/2)-arccos((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points);
-    curT:=sin(angle)+ii*cos(angle);
-    
+    angle:=arccos((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points);
+    a:=curT; b:=0; m:=0;
+    try( m=max(abs(a),1);
+    ) then (
+       a= a/m; 
+       b= 1/m;
+    ) else (
+       a=1; 
+       b=0;
+    );
     
     --ERROR: something eack going on here, we go from angle 0 to angle 1 in a single step (shouldn't be running homctn in the first place then)
       --bigger problem is that the sometime we just skip this else block (i.e., there is no "running homctn stepx" print statement, but there is a "indeed reached end portal via hom ctn")
       --should be solved now, was an issue with angle being taken wrt to xz-plane, instead of xy-plane
-      
+   
     --so moving up the sphere
     if endIndex==1 then (
-        while (pi/2)-angle >epsilon do (
+        while abs(b)>epsilon do (
             --print("running homctn step1", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
-            minD:=max(B3*rad, epsilon/2);
+            --minD:=max(B3*rad, epsilon/2);
+            minD:=B3*rad;
             --print(curT, minD);
         
             --minD approximately arc length, and then arc length is equal to angle on unit circle
-            angle=min(pi/2, angle+minD);
+            angle=max(0, angle-minD);
             
-            curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
-            curT=sin(angle)+ii*cos(angle);
+            nextT=getCList({sin(angle)*cos(xyangle), sin(angle)*sin(xyangle), cos(angle)});
             
-            --print peek F;
-            --print curT;
-            specF=specializeSystem(point{{realPart(curT), imaginaryPart(curT)}}, F);
+            curX=point{evaluateAt(pades, curT, nextT)};--may need to change how pades works, FINISH HERE
+            curT=nextT;
+            --print("curT here is ",curT);
+            a=curT;
+            try( m=max(abs(a),1);
+            ) then (
+               a= a/m; 
+               b= 1/m;
+            ) else (
+               a=1; 
+               b=0;
+            );
+            --print("(a,b) is ",a, b);
+            specF=specializeSystem(point{{a,b}}, F);
+            --print peek specF;
             for i from 1 to numNewton do (
                 curX=newton(polySystem(specF),curX);
             );
         );
     --so moving down the sphere
     ) else (
-        while angle>epsilon do (
+        while abs(a)>epsilon do (
             --print("running homctn step2", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
@@ -578,27 +610,41 @@ homCtn=(F, xi, i, indexP, endIndex)->{
             --print(curT, minD);
             
             --minD approximately arc length, and then arc length is equal to angle on unit circle
-            angle=max(0, angle-minD);
-        
-            curX=point{evaluateAt(pades, curT, sin(angle)+ii*cos(angle))};--may need to change how pades works, FINISH HERE
-            curT=sin(angle)+ii*cos(angle);
+            angle=min(pi, angle+minD);
             
-            specF=specializeSystem(point{{realPart(curT), imaginaryPart(curT)}}, F);
+            nextT=getCList({sin(angle)*cos(xyangle), sin(angle)*sin(xyangle), cos(angle)});
+        
+            curX=point{evaluateAt(pades, curT, nextT)};--may need to change how pades works, FINISH HERE
+            curT=nextT;
+            --print("curT here is ",curT);
+            a=curT;
+            try( m=max(abs(a),1);
+            ) then (
+               a= a/m; 
+               b= 1/m;
+            ) else (
+               a=1; 
+               b=0;
+            );
+            --print("(a,b) is ",a, b);
+            specF=specializeSystem(point{{a,b}}, F);
+            --print peek specF;
             for i from 1 to numNewton do (
                 curX=newton(polySystem(specF),curX);
             );
         );
     );
-
+    --print("does this break below, running newton at end of homctn", peek specF);--ERROR: yes indeed it does, because the values are like 10e11
     timesCor=0;
     while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
     assert (norm evaluate(polySystem(specF), curX)<epsilon);--somehow this assertion is passing
+    --print("no it does not");
 
     newSol=rounds(roundTo,curX.Coordinates);
     (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
-};
+}; 
 
 --homotopy continuation add on for find seed ONLY:
 --R: Pade must be implemented (b/c uses a priori step size). Has same requirements as iteranteOnce
@@ -894,10 +940,12 @@ createLowerTriangle=(indexP, i)->{
     newB.Index=curIndex+1;
     newC.Index=curIndex+2;
     
+    print("does this break",(tableVertexIndexList#(indexP_0)#(indexP_1)).theLength);
     --adds these new vertices to the index list
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newA);
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newB);
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newC);
+    print("not it does not");
     
     
     --creates new triangles and adds them to the triangeList
@@ -1333,7 +1381,7 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=false;
+verbose=true;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga (and hom ctn closeness)
@@ -1346,7 +1394,7 @@ L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
-B3=2;--jump size in hom ctn
+B3=1;--jump size in hom ctn
     
 
 -*
