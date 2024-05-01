@@ -49,7 +49,7 @@ random Type := o -> R -> (
 
 --rounds list of complex numbers to n decimal places
 --used for storing approx zeroes/params in hashtable w/o unnecessary overlap
---ERROR: one of n, a is a NotANumber
+--ERROR: one of n, a is a NotANumber. somehow fixed a while ago
 rounds=method();
 rounds:=(n,listL)->{
     if length(listL)<=0 then (print("n is", n, "the list is", listL); assert(false););
@@ -96,7 +96,7 @@ getC(Vertex):=(v)->{
 
 --given a list, turns it into a complex number via steroegraph projection sigma_(0:1)
 --potentially just want to store this in its own table? to avoid much repeated computation
-getCList:=(triple)->
+getCList:=(triple)->{
     if triple == {0,0,1} then (
         --return (1,0);
         return ((2*0.149)/ (1-0.99))+ ((2*0.005)/(1-0.99))*ii;--is a point near the top
@@ -127,8 +127,9 @@ arccos=(triple)->{
 --M: none
 --E: returns true if elmnt is "close" to some element of theList (i.e., all coords are at most e away)
 closeMember=(elmnt, theList, e)->{
-    theList=toList(theList);
+    if theList===set{} then return false;
     --print (elmnt, theList);
+    theList=toList(theList);
     for x in theList do (
        for coords in 0..(length(elmnt)-1) do (
            --print (coords, realPart(elmnt_coords), realPart(x_coords), imaginaryPart(elmnt_coords), imaginaryPart(x_coords));
@@ -141,6 +142,29 @@ closeMember=(elmnt, theList, e)->{
     );
     --print("false");
     return false;
+};
+
+--R: to sets list1, list2, and error bound e (see closeMethod)
+--M: none
+--E: returns set containing approximately unique elements of each set
+closeJoinSet=(list1, list2, e)->{
+    if list1===set{} then return list2;
+    if list2===set{} then return list1;
+    list1=toList(list1);
+    list2=toList(list2);
+    longerList:=null;
+    shorterList:=null;
+    if length(list1)>length(list2) then(
+        longerList=list1;
+        shorterList=list2;
+    ) else (
+        longerList=list2;
+        shorterList=list1;
+    );
+    for x in shorterList do(
+        if not closeMember(x, longerList, e) then longerList=append(longerList, x);
+    );
+    return set(longerList);
 };
 
 ------------------------------------------------------------------------------------------------------------------------------------
@@ -446,6 +470,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
             ) else (
                 (tableSols_(indexP_0)_(indexP_1))#j=set{};
             );
+            --print("inRGA will be adding", set{newSol}," to ",(tableSols_(indexP_0)_(indexP_1))#j);
             (tableSols_(indexP_0)_(indexP_1))#j=(tableSols_(indexP_0)_(indexP_1))#j +set{newSol}; --adds xi solution to ti
             return (true, newSol);
         
@@ -654,14 +679,17 @@ homCtn=(F, xi, i, indexP, endIndex)->{
             );
         );
     );
-    --print("does this break below, running newton at end of homctn", peek specF);--ERROR: yes indeed it does, because the values are like 10e11
+    --print("does this break below, running newton at end of homctn", peek specF);--ERROR: yes indeed it does, because the values are like 10e11. should be solved now
     timesCor=0;
     while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
     --assert (norm evaluate(polySystem(specF), curX)<epsilon);--somehow this assertion is passing
     --print("no it does not");
 
     newSol=rounds(roundTo,curX.Coordinates);
-    if not closeMember(newSol, (tableSols_(indexP_0)_(indexP_1))#endIndex, e) then (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
+    if not closeMember(newSol, (tableSols_(indexP_0)_(indexP_1))#endIndex, e) then(
+        --print("homCtn will be adding", set{newSol}," to ",(tableSols#(indexP_0)#(indexP_1))#endIndex);
+        (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
+    );    
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
 }; 
@@ -1297,11 +1325,16 @@ searchOuter=(F, i)->{
                 
                 --x0 has now been tracked from ti to tj, so can remove from not tracked
                 solsNotTracked#i#j=solsNotTracked#i#j -set{x0};
+                --print("searchOuter will be adding", set{x0}," to ",solsTracked#i#j);
                 solsTracked#i#j=solsTracked#i#j+set{x0};
                 
-                --if newSol hasn't been tracked before, and isn't currently already in list to be tracked, then add it to be tracked
+                --if newSol hasn't been tracked before then add it to be tracked
                 for edges from 0 to numMega-1 do(
-                    if j!=edges and newSol!={} and not(closeMember(newSol, solsTracked#j#edges, e)) and not(closeMember(newSol, solsNotTracked#j#edges, e)) then solsNotTracked#j#edges =solsNotTracked#j#edges +set{newSol};
+                    if j!=edges and newSol!={} and not(closeMember(newSol, solsTracked#j#edges, e)) then(
+                        --print("searchOuter will be adding", set{newSol}," to ",solsNotTracked#j#edges);
+                        solsNotTracked#j#edges =solsNotTracked#j#edges +set{newSol};
+                    );
+                    
                 );
             
                 --for x in solsNotTracked do print peek x;
@@ -1311,8 +1344,9 @@ searchOuter=(F, i)->{
             prevCount:=#(megaSols#j);
             
             --the min of i, j, is the one held in slot 0 of the edge solution hashtable
-            megaSols#(min(i,j))=(megaSols#(min(i,j)))+(tableSols_(min(i,j))_(max(i,j)))#0;
-            megaSols#(max(i,j))=(megaSols#(max(i,j)))+(tableSols_(min(i,j))_(max(i,j)))#1;
+            --ERROR: here is where closeMember is not being called, and is causing the mess up! (in all likelihood) should be solved now via closeJoinSet
+            megaSols#(min(i,j))= closeJoinSet( (megaSols#(min(i,j))), (tableSols_(min(i,j))_(max(i,j)))#0, e) ;
+            megaSols#(max(i,j))= closeJoinSet( (megaSols#(max(i,j))), (tableSols_(min(i,j))_(max(i,j)))#1, e) ;
             
             if verbose then (
                 print("Edge algorithm from has finished.");
