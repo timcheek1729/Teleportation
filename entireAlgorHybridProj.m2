@@ -123,6 +123,26 @@ arccos=(triple)->{
     );
 };
 
+--R: elmnt a list of CC of length n, and theList a set of length n lists
+--M: none
+--E: returns true if elmnt is "close" to some element of theList (i.e., all coords are at most e away)
+closeMember=(elmnt, theList, e)->{
+    theList=toList(theList);
+    --print (elmnt, theList);
+    for x in theList do (
+       for coords in 0..(length(elmnt)-1) do (
+           --print (coords, realPart(elmnt_coords), realPart(x_coords), imaginaryPart(elmnt_coords), imaginaryPart(x_coords));
+           if abs(realPart(elmnt_coords)-realPart(x_coords))>e or abs(imaginaryPart(elmnt_coords)-imaginaryPart(x_coords))>e then break;
+           if coords==(length(elmnt)-1) then( 
+               --print("true"); 
+               return true;
+           );
+       );
+    );
+    --print("false");
+    return false;
+};
+
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 --BELOW is all of the Pade, power series stuff 
@@ -422,7 +442,7 @@ inRGA=(F, fti, i0, j, indexP)-> {
         
             newSol=rounds(roundTo,xj.Coordinates);
             try(--because when adding smaller triangles, tableSols isn't automatically extended
-                if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1); );
+                if closeMember(newSol, (tableSols_(indexP_0)_(indexP_1))#j, e) then ( return (false, -1); );
             ) else (
                 (tableSols_(indexP_0)_(indexP_1))#j=set{};
             );
@@ -516,8 +536,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
                 );--if
             );--for
             --so did not successfully jump to any of the vertices in this triangle, for whatever reason, so we triangulate it here (only effects next run)
-            --print("we have created a lower triangle now");
-            if ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength<numMini then createLowerTriangle(indexP, potNextTriangleIndex);
+            --numMini is upper bound on number of total vertices allowed on a given sphere (to prevent huge cppVector pushbacks)
+            if (tableVertexIndexList#(indexP_0)#(indexP_1)).theLength<numMini then createLowerTriangle(indexP, potNextTriangleIndex);
             
             theIterator=theIterator-1;
         );--while
@@ -637,11 +657,11 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     --print("does this break below, running newton at end of homctn", peek specF);--ERROR: yes indeed it does, because the values are like 10e11
     timesCor=0;
     while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
-    assert (norm evaluate(polySystem(specF), curX)<epsilon);--somehow this assertion is passing
+    --assert (norm evaluate(polySystem(specF), curX)<epsilon);--somehow this assertion is passing
     --print("no it does not");
 
     newSol=rounds(roundTo,curX.Coordinates);
-    (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
+    if not closeMember(newSol, (tableSols_(indexP_0)_(indexP_1))#endIndex, e) then (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
     if verbose then print("INDEED REACHED END PORTAL (via hom ctn), sol is ",newSol);
     return newSol;
 }; 
@@ -940,12 +960,10 @@ createLowerTriangle=(indexP, i)->{
     newB.Index=curIndex+1;
     newC.Index=curIndex+2;
     
-    print("does this break",(tableVertexIndexList#(indexP_0)#(indexP_1)).theLength);
     --adds these new vertices to the index list
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newA);
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newB);
     pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newC);
-    print("not it does not");
     
     
     --creates new triangles and adds them to the triangeList
@@ -1281,9 +1299,9 @@ searchOuter=(F, i)->{
                 solsNotTracked#i#j=solsNotTracked#i#j -set{x0};
                 solsTracked#i#j=solsTracked#i#j+set{x0};
                 
-                --if newSol hasn't been tracked before, then add it to be tracked
+                --if newSol hasn't been tracked before, and isn't currently already in list to be tracked, then add it to be tracked
                 for edges from 0 to numMega-1 do(
-                    if j!=edges and newSol!={} and not(member(newSol, solsTracked#j#edges)) then solsNotTracked#j#edges =solsNotTracked#j#edges +set{newSol};
+                    if j!=edges and newSol!={} and not(closeMember(newSol, solsTracked#j#edges, e)) and not(closeMember(newSol, solsNotTracked#j#edges, e)) then solsNotTracked#j#edges =solsNotTracked#j#edges +set{newSol};
                 );
             
                 --for x in solsNotTracked do print peek x;
@@ -1381,13 +1399,14 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=true;
+verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga (and hom ctn closeness)
 fwdErrB=0.1; --determines max fwdErr
-numMini=100; --number of points to be in complex line rga case
-numMega=3; --number of multiparameter points to sample from
+e=0.2; --determines error in two solutions being considered "the same" in closeMember
+numMini=400; --number of points to be in complex line rga case
+numMega=4; --number of multiparameter points to sample from
 onDisk=true;--if true then sample miniPortals from unit disk, otherwise sample from unit circle
 numGauss=0; --number of times to correct power series approx, if <0 then don't correct (usually don't need to correct anyway)
 L=1; --order of numerator in Pade
