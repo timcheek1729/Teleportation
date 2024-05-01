@@ -49,8 +49,10 @@ random Type := o -> R -> (
 
 --rounds list of complex numbers to n decimal places
 --used for storing approx zeroes/params in hashtable w/o unnecessary overlap
+--ERROR: one of n, a is a NotANumber
 rounds=method();
 rounds:=(n,listL)->{
+    if length(listL)<=0 then (print("n is", n, "the list is", listL); assert(false););
     r={};
     for num in listL do(
         a=realPart(num);
@@ -406,11 +408,13 @@ inRGA=(F, fti, i0, j, indexP)-> {
         if (getNorm(initGuess, xj.Coordinates) < epsilon) and (fwdError<fwdErrB) then (
         
             newSol=rounds(roundTo,xj.Coordinates);
-            if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1) ) else (--ERROR: no key j found. Should be solved now, j used to be passed in the literal corr C value
-                (tableSols_(indexP_0)_(indexP_1))#j=(tableSols_(indexP_0)_(indexP_1))#j +set{newSol}; --adds xi solution to ti
-                return (true, newSol);
-            
+            try(--because when adding smaller triangles, tableSols isn't automatically extended
+                if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1); );
+            ) else (
+                (tableSols_(indexP_0)_(indexP_1))#j=set{};
             );
+            (tableSols_(indexP_0)_(indexP_1))#j=(tableSols_(indexP_0)_(indexP_1))#j +set{newSol}; --adds xi solution to ti
+            return (true, newSol);
         
         ) else (
             print("jump failed--fwd error too big");
@@ -454,6 +458,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         z1:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points)#2;
         
         --gets how many triangles this vertex is currently known to be in
+        --ERROR: we have an error here, after a mini woohoo. basically @ throws an error here. fixed, needed createrLowerTriangle to add empty cppVectors to tableVertexTC
         theIterator:= ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength -1;
         --since this vertex is currently in a triangle that we know 
         if theIterator==-1 then (
@@ -477,7 +482,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
                 z2:=((((tableVertexIndexList#(indexP_0)#(indexP_1)))@j).Points)#2;
                 
                 --if closer to desired pole, and within pade range, and is valid
-                if ((endIndex==0 and z1>z2) or (endIndex==1 and z1<z2)) and abs(c-c2)<maxD then (
+                --note that the <,> condition prevents you from calling inRGA on i==j
+                if ((endIndex==0 and z1>z2) or (endIndex==1 and z1<z2)) and abs(c-c2)<maxD and ((tableVertexIndexList#(indexP_0)#(indexP_1))@j).valid==true then (
                     potentialZero:=inRGA(F, pades, c, j, indexP);
                     
                     if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
@@ -495,8 +501,11 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
                         --above return: breaks dfs, i.e., only ever jump once for a given (sol, t0) pair
                     );--if
                 );--if
-                
             );--for
+            --so did not successfully jump to any of the vertices in this triangle, for whatever reason, so we triangulate it here (only effects next run)
+            --print("we have created a lower triangle now");
+            createLowerTriangle(indexP, potNextTriangleIndex);
+             
             theIterator=theIterator-1;
         );--while
         
@@ -597,6 +606,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
   --:also, F is of the form tA+(1-t)B
 --M: none
 --E: returns solution found at end of hom ctn
+--FINISH here: am not conviced this actually works, do need to check (is of lowest priority, though)
 
 homCtnfs=(F, xi, curT, indexP, endIndex)->{
     --no longer pass in index of curT b/c want to throw that index out for failing
@@ -861,38 +871,37 @@ initializeLevelZero(cppVector, cppVector, cppVector):=(triangleList, vertexIndex
     pushBack(triangleList, t8);    
 };
 
---
 --R: triangleList@index is the triangle to be midpointed, that has NOT already been midpointed
 --M: triangleList (adds in 4 new triangles), vertexIndexList (adds in 4 new vertexes)
    --: and triangle that's been midpointed (adds in pointers to children)
+   --:adds 4 empty cpp vectors into tableVertexTC
 --E: midpoints the given triangle, adding the 4 news ones to triangleList
-createLowerTriangle=method();
-createLowerTriangle(ZZ):=(i)->{
-    assert((triangleList@i).AT==null);
+createLowerTriangle=(indexP, i)->{
+    assert(((tableTriangleList#(indexP_0)#(indexP_1))@i).AT==null);
     
     --get vertices of the triangle
-    a:=(triangleList@i).Vertices#0;
-    b:=(triangleList@i).Vertices#1;
-    c:=(triangleList@i).Vertices#2;
+    a:=((tableTriangleList#(indexP_0)#(indexP_1))@i).Vertices#0;
+    b:=((tableTriangleList#(indexP_0)#(indexP_1))@i).Vertices#1;
+    c:=((tableTriangleList#(indexP_0)#(indexP_1))@i).Vertices#2;
     
     --new* is labeled as opposite from vertex *
     newA:=b+c;
     newB:=a+c;
     newC:=a+b;
     
-    curIndex=vertexIndexList.theLength;
+    curIndex=tableVertexIndexList#(indexP_0)#(indexP_1).theLength;
     newA.Index=curIndex;
     newB.Index=curIndex+1;
     newC.Index=curIndex+2;
     
     --adds these new vertices to the index list
-    pushBack(vertexIndexList, newA);
-    pushBack(vertexIndexList, newB);
-    pushBack(vertexIndexList, newC);
+    pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newA);
+    pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newB);
+    pushBack(tableVertexIndexList#(indexP_0)#(indexP_1), newC);
     
     
     --creates new triangles and adds them to the triangeList
-    lastEntry=triangleList.theLength;
+    lastEntry=(tableTriangleList#(indexP_0)#(indexP_1)).theLength;
     
     --order is VERY IMPORTANT of how vertices get added in below
     --FIXED index issue below (next entry gets put in at lastEntry index, NOT lastEntry+1)
@@ -901,18 +910,20 @@ createLowerTriangle(ZZ):=(i)->{
     t3:= new Triangle from {Vertices=> {c, newC, newA}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+2};
     t4:= new Triangle from {Vertices=> {newA, newB, newC}, AT=>null, BT=>null, CT=>null, nT=>null, Index=>lastEntry+3};
     
-    pushBack(triangleList, t1);
-    pushBack(triangleList, t2);
-    pushBack(triangleList, t3);
-    pushBack(triangleList, t4);
+    pushBack(tableTriangleList#(indexP_0)#(indexP_1), t1);
+    pushBack(tableTriangleList#(indexP_0)#(indexP_1), t2);
+    pushBack(tableTriangleList#(indexP_0)#(indexP_1), t3);
+    pushBack(tableTriangleList#(indexP_0)#(indexP_1), t4);
     
     --links ''children'' triangles to ''parent'' triangle
-    (triangleList@i).AT=t1;
-    (triangleList@i).BT=t2;
-    (triangleList@i).CT=t3;
-    (triangleList@i).nT=t4;
+    ((tableTriangleList#(indexP_0)#(indexP_1))@i).AT=t1;
+    ((tableTriangleList#(indexP_0)#(indexP_1))@i).BT=t2;
+    ((tableTriangleList#(indexP_0)#(indexP_1))@i).CT=t3;
+    ((tableTriangleList#(indexP_0)#(indexP_1))@i).nT=t4;
+    
+    --adds 4 empty cpp vectors into tableVertexTC
+    for i in 0..3 do (pushBack(tableVertexTC#(indexP_0)#(indexP_1), new cppVector from {theCnts=> new MutableList from {}, theLength=> 0}));
 };
---createLowerTriangle(0);
 
 
 --CHECK: need something to update triangles that the point is in
@@ -970,7 +981,7 @@ getNextPt=(indexP, i, j)->{
   indexOfLastPushBack:= (((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength)-1;
   if (((tableVertexTC#(indexP_0)#(indexP_1))@i)@(indexOfLastPushBack)).Index ==initialJ then (
       --has been checked, and works as it should, i.e., does NOT override the underlying class object
-      (((tableVertexTC#(indexP_0)#(indexP_1))@i).theCnts)#indexOfLastPushBack= triangleList@j;
+      (((tableVertexTC#(indexP_0)#(indexP_1))@i).theCnts)#indexOfLastPushBack= (tableTriangleList#(indexP_0)#(indexP_1))@j;
   ) else (
       pushBack(((tableVertexTC#(indexP_0)#(indexP_1))@i), ((tableTriangleList#(indexP_0)#(indexP_1))@j));
   );
@@ -987,9 +998,6 @@ getNextPt=(indexP, i, j)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 
 parametrizeFamily=(F, p0, p1)->{
-    --FINISH HERE: need to switch to a sF_p0+tF_p1=0, rather than a F_{sp_0+tp_1}
-    --CHECK: t,s are actually in the right order
-
     listOfVariables:=gens(ring(F));
     listOfParams:=parameters(F);
     combinedListOfVariables:=append(listOfVariables, "t"); 
