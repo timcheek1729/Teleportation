@@ -17,7 +17,7 @@
 
 
 needsPackage "NumericalAlgebraicGeometry";
-needsPackage "MonodromySolver";=
+needsPackage "MonodromySolver";
 --contains list of vertices, ''pointers'' to triangles in it
 --.Vertices is list of vertices 
 --AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
@@ -459,11 +459,12 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         if theIterator==-1 then (
             assert(false== (class(curTriangleIndex)===class(null)));--only should be null for north/south pole
             getNextPt(indexP, i, curTriangleIndex);--adds in current triangle
-            theIterator=1;
+            theIterator=0;
         );
         
-        while theIterator>0 do (
+        while theIterator>=0 do (
             --print peek (((tableVertexTC#(indexP_0)#(indexP_1))@i)@theIterator);
+            --ERROR: the @ error happens in the following line, after a mini woohoo happens. do this is now fixed (changed to >= in line above, =0 in line before)
             potNextTriangleIndex:= getNextPt(indexP, i, (((tableVertexTC#(indexP_0)#(indexP_1))@i)@theIterator).Index );
             potNextTriangle:= (tableTriangleList#(indexP_0)#(indexP_1))@potNextTriangleIndex;
             
@@ -486,6 +487,9 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 
                         --if found newSol and should keep going, then calls on new solution pair
                         if verbose then print("mini woohoo");
+                        --ERROR: have an "error: array index 1 out of bounds 0 .. 0" error that throws right after mini woohoo prints for the first time (muh other stuff run, printed before this)
+                          --this gets thrown on using the @ operator
+                          --is now fixed, see error comment in this while loop at the top
                         return iterateOnceHelper(F, potentialZero_1, j, indexP, endIndex, potNextTriangleIndex);
 
                         --above return: breaks dfs, i.e., only ever jump once for a given (sol, t0) pair
@@ -520,7 +524,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     curT:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@i); --is the C coordinate of vertex at indexP
     curX:=point{xi};
     
-    print("have entered hom ctn, we have that curT is", curT, "curX is ", curX, "and then endIndex is", endIndex);
+    if verbose==true then print("have entered hom ctn, we have that curT is", curT, "curX is ", curX, "and then endIndex is", endIndex);
     
     --gets argument of curT
     --angle:=atan2(imaginaryPart(curT), realPart(curT)); 
@@ -536,7 +540,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     --so moving up the sphere
     if endIndex==1 then (
         while (pi/2)-angle >epsilon do (
-            print("running homctn step1", angle);
+            --print("running homctn step1", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
             minD:=max(B3*rad, epsilon/2);
@@ -558,7 +562,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     --so moving down the sphere
     ) else (
         while angle>epsilon do (
-            print("running homctn step2", angle);
+            --print("running homctn step2", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
             minD:=max(B3*rad, epsilon/2);
@@ -671,7 +675,11 @@ pushBack:=(arr, x)->{
     return (arr.theLength)-1;
 }
 --makes it easier to grab elements from the vector
-cppVector @ ZZ:=(arr,i)-> {return (arr.theCnts)#i;};
+cppVector @ ZZ:=(arr,i)-> {
+    if i>=arr.theLength then (for x in arr.theCnts do print peek x; print("i is ", i); print("the length is ",arr.theLength); assert(false);
+    ) else ( return (arr.theCnts)#i;
+    );
+};
 --debugging below
 --arr1=new cppVector from {theCnts=>new MutableList, theLength=>0};
 --print peek arr1;
@@ -1317,7 +1325,7 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=true;
+verbose=false;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga (and hom ctn closeness)
@@ -1330,7 +1338,7 @@ L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
-B3=1;--jump size in hom ctn
+B3=2;--jump size in hom ctn
     
 
 -*
@@ -1365,9 +1373,9 @@ parametrizedCyclic = n -> (
 	polySystem transpose matrix {polysP}
 );
 
---polys = parametrizedCyclic 3;
+polys = parametrizedCyclic 3;
 
---time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 
 --param=(#(parameters(polys))-1:1);
 --param=toList(append(param, -1));
@@ -1376,12 +1384,12 @@ parametrizedCyclic = n -> (
 --time mo=solveAll(polys, oneSol, param);
 
 
---print length(toList(mo));
---print peek megaSols;
+print length(toList(mo));
+print peek megaSols;
 
 
 
-
+-*
 R=CC[p][x];
 f=(x^3-3*x-p);
 x0={0};
@@ -1389,7 +1397,7 @@ t0={0};
 time mo=solveAll(polySystem{f}, x0, t0);
 print peek megaSols;
 --ERROR: have same solution set for too many systems. Seemed to have solved this after editing the homctn function (redid the anlge part)
-
+*-
 
 -*
 needsPackage "PHCpack";
