@@ -17,8 +17,7 @@
 
 
 needsPackage "NumericalAlgebraicGeometry";
-needsPackage "MonodromySolver";
-
+needsPackage "MonodromySolver";=
 --contains list of vertices, ''pointers'' to triangles in it
 --.Vertices is list of vertices 
 --AT, BT, CT, nT pointers to 4 smaller triangles (sharing vertices with old A, B, C, and none)
@@ -69,7 +68,7 @@ rounds:=(n,listL)->{
 --E: returns norm of their difference
 
 getNorm=(list1, list2)->{
-    s=0;
+    s:=0;
     for x in (list1-list2) do (
         s=s+(realPart(x))^2+(imaginaryPart(x))^2;
     );
@@ -82,15 +81,28 @@ getC=method();
 getC(Vertex):=(v)->{
     if v.Points == {0,0,1} then (
         --return (1,0);
-        return ((2*0.1)/ (1-0.99))+ ((2*0.1)/(1-0.99))*ii;
+        return ((2*0.149)/ (1-0.99))+ ((2*0.005)/(1-0.99))*ii;--is a point near the top
     ) else (
         --steroegraphic projection down to plane tangest to south pth
         x:= (v.Points)#0;
         y:= (v.Points)#1;
         z:= (v.Points)#2;
         return ((2*x)/ (1-z))+ ((2*y)/(1-z))*ii;
-        --am skeptical that this runs how I want it to in terms of the magnitudes that it generates, FINISH HERE
-        --very much need first coordinate to be greater than 1 at some point
+        --very much need first coordinate to be greater than 1 at some point, which does happen near the top
+    );
+};
+
+--R: need x^2+y^2+z^2=1, where triple=(x,y,z)
+--M: none
+--E: returns the angle betwen the z axis and the xy-plane (NOT from the plane up to the z-axis, but DOWN from the axis to the plane)
+arccos=(triple)->{
+    x:=triple_0;
+    y:=triple_1;
+    z:=triple_2;
+    if z==0 then (
+        return pi/2;
+    ) else (
+        return atan2(sqrt(x*x+y*y),z);
     );
 };
 
@@ -294,6 +306,7 @@ getApprox:=(F, xi, i, ti)->{
         --CHECK HERE: am NOT doing any reshifting of t are anything, which I did before
         --SOLVED: I actually am reshifting t, it is just that this is happenind (as before) in the getPSApprox function
         newF=append(newF, sub((func_0), {s=>one}));
+        --ERROR: sometimes have "error: baseName: no base name available". should be solved, previous function was accidently overwriting s with a number
     );
 
     newF=polySystem(newF);
@@ -357,8 +370,21 @@ inRGA=(F, fti, i0, j, indexP)-> {
     --tj=tableVertexIndexList#(indexP_0)#(indexP_1))@j;
     --ti=tableVertexIndexList#(indexP_0)#(indexP_1))@i0;
     ti:=i0;
-    tj:=j;
-    specF=specializeSystem(point{{tj}}, F);
+    tj:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@j);
+    
+    m;
+    one;
+    --so not at north pole
+    try( m=max(abs(tj),1);
+    ) then (
+        ti= tj/m; 
+        one= 1/m;
+    ) else (
+        ti=1; 
+        one=0;
+    );
+    
+    specF=specializeSystem(point{{tj, one}}, F);
     
     --initGuess=flatten(toList(entries(evaluate(fti,point{{tj}}))));
     initGuess=evaluateAt(fti, ti, tj);
@@ -374,12 +400,13 @@ inRGA=(F, fti, i0, j, indexP)-> {
         
         );
     ) then (
-        fwdError=norm(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj}}, F)), xj)))));
+        --ERROR: sometimes have error here, in that "encounted values for 2 variables, but expected 3". Should be solved now, added ", one"
+        fwdError=norm(flatten(toList(entries(evaluate(polySystem(specializeSystem(point{{tj, one}}, F)), xj)))));
         --print fwdError;
         if (getNorm(initGuess, xj.Coordinates) < epsilon) and (fwdError<fwdErrB) then (
         
             newSol=rounds(roundTo,xj.Coordinates);
-            if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1) ) else (
+            if member(newSol, (tableSols_(indexP_0)_(indexP_1))#j) then ( return (false, -1) ) else (--ERROR: no key j found. Should be solved now, j used to be passed in the literal corr C value
                 (tableSols_(indexP_0)_(indexP_1))#j=(tableSols_(indexP_0)_(indexP_1))#j +set{newSol}; --adds xi solution to ti
                 return (true, newSol);
             
@@ -430,8 +457,8 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
         theIterator:= ((tableVertexTC#(indexP_0)#(indexP_1))@i).theLength -1;
         --since this vertex is currently in a triangle that we know 
         if theIterator==-1 then (
-            assert(class(curTriangleIndex)!=class(null));--only should be null for north/south pole
-            getNextPT(indexP, i, curTriangleIndex);--adds in current triangle
+            assert(false== (class(curTriangleIndex)===class(null)));--only should be null for north/south pole
+            getNextPt(indexP, i, curTriangleIndex);--adds in current triangle
             theIterator=1;
         );
         
@@ -450,7 +477,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
                 
                 --if closer to desired pole, and within pade range, and is valid
                 if ((endIndex==0 and z1>z2) or (endIndex==1 and z1<z2)) and abs(c-c2)<maxD then (
-                    potentialZero:=inRGA(F, pades, c, c2, indexP);
+                    potentialZero:=inRGA(F, pades, c, j, indexP);
                     
                     if potentialZero_0==false and potentialZero_1==-1 then (print ("jumped to known place"); return {};);
                     if potentialZero_0 then (
@@ -468,7 +495,7 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
             );--for
             theIterator=theIterator-1;
         );--while
- 
+        
         --overwrites t for being bad, now will never jump here, unless is start or end
         if i!=0 and i!=1 then ((tableVertexIndexList#(indexP_0)#(indexP_1))@i).valid=false;
         return homCtn(F, xi, i, indexP, endIndex);
@@ -490,21 +517,26 @@ iterateOnce=(F, xi, i, indexP, endIndex)->{
 --E: returns solution found at end of hom ctn
 
 homCtn=(F, xi, i, indexP, endIndex)->{
-    --no longer pass in index of curT b/c want to throw that index out for failing
-    --curT=(tableLOP#(indexP_0)#(indexP_1))#i;
-    --print curT;
-    
     curT:=getC((tableVertexIndexList#(indexP_0)#(indexP_1))@i); --is the C coordinate of vertex at indexP
     curX:=point{xi};
     
+    print("have entered hom ctn, we have that curT is", curT, "curX is ", curX, "and then endIndex is", endIndex);
+    
     --gets argument of curT
-    angle:=atan2(imaginaryPart(curT), realPart(curT)); 
+    --angle:=atan2(imaginaryPart(curT), realPart(curT)); 
+    --NOTE: the arccos function measures the angle DOWN from the z-axis, rather than UP from the plane
+    angle:=(pi/2)-arccos((((tableVertexIndexList#(indexP_0)#(indexP_1)))@i).Points);
     curT:=sin(angle)+ii*cos(angle);
     
+    
+    --ERROR: something eack going on here, we go from angle 0 to angle 1 in a single step (shouldn't be running homctn in the first place then)
+      --bigger problem is that the sometime we just skip this else block (i.e., there is no "running homctn stepx" print statement, but there is a "indeed reached end portal via hom ctn")
+      --should be solved now, was an issue with angle being taken wrt to xz-plane, instead of xy-plane
+      
     --so moving up the sphere
     if endIndex==1 then (
         while (pi/2)-angle >epsilon do (
-            --print("running homctn step1", angle);
+            print("running homctn step1", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
             minD:=max(B3*rad, epsilon/2);
@@ -526,7 +558,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
     --so moving down the sphere
     ) else (
         while angle>epsilon do (
-            --print("running homctn step2", angle);
+            print("running homctn step2", angle);
             pades:=getApprox(F, curX.Coordinates,i, curT);
             rad:=getD(pades);
             minD:=max(B3*rad, epsilon/2);
@@ -547,6 +579,7 @@ homCtn=(F, xi, i, indexP, endIndex)->{
 
     timesCor=0;
     while(norm evaluate(polySystem(specF), curX)>0.00001 or timesCor<10) do ( curX=newton(polySystem(specF), curX); timesCor=timesCor+1);
+    assert (norm evaluate(polySystem(specF), curX)<epsilon);--somehow this assertion is passing
 
     newSol=rounds(roundTo,curX.Coordinates);
     (tableSols#(indexP_0)#(indexP_1))#endIndex=(tableSols#(indexP_0)#(indexP_1))#endIndex +set{newSol};
@@ -649,10 +682,11 @@ cppVector @ ZZ:=(arr,i)-> {return (arr.theCnts)#i;};
 --M: nothing
 --E: returns a random point on the unit sphere in R^3
 randomS2point=()->{
-    a:=random(RR);
-    b:=random(RR);
-    c:=random(RR);
+    a:=(-1)^(lift(mod(random(ZZ),2),ZZ)) *random(RR);
+    b:=(-1)^(lift(mod(random(ZZ),2),ZZ)) *random(RR);
+    c:=(-1)^(lift(mod(random(ZZ),2),ZZ)) *random(RR);
     d:=1.0/sqrt(a*a+b*b+c*c);
+    --assert(a*a*d*d+b*b*d*d+c*c*d*d -1< 0.001);
     return {a*d, b*d, c*d};
 };
 
@@ -1283,7 +1317,7 @@ findSeed=(F, p0)->{
 ------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
 
-verbose=false;
+verbose=true;
 numNewton=3; --max number of times to runs Newtons for
 roundTo=2; --determines how many digits to round solutions to
 epsilon=0.1; --main function is to how far away zeroGuesses and trueZeroes can be to stay in rga (and hom ctn closeness)
@@ -1296,7 +1330,7 @@ L=1; --order of numerator in Pade
 M=1; --order of denominator in Pade
 B1=0; --lower bound scalar for jump zone annulus
 B2=0.8; --upper bound scalar for jump zone annulus
-B3=2;--jump size in hom ctn
+B3=1;--jump size in hom ctn
     
 
 -*
@@ -1331,9 +1365,9 @@ parametrizedCyclic = n -> (
 	polySystem transpose matrix {polysP}
 );
 
-polys = parametrizedCyclic 3;
+--polys = parametrizedCyclic 3;
 
-time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
+--time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,1,1,1,1,-1});
 
 --param=(#(parameters(polys))-1:1);
 --param=toList(append(param, -1));
@@ -1342,19 +1376,20 @@ time mo=solveAll(polys, {1, -0.5*ii*(-ii+sqrt(3)), 0.5*ii*(ii+sqrt(3))}, {1,1,1,
 --time mo=solveAll(polys, oneSol, param);
 
 
-print length(toList(mo));
-print peek megaSols;
+--print length(toList(mo));
+--print peek megaSols;
 
 
 
--*
+
 R=CC[p][x];
 f=(x^3-3*x-p);
 x0={0};
 t0={0};
 time mo=solveAll(polySystem{f}, x0, t0);
 print peek megaSols;
-*-
+--ERROR: have same solution set for too many systems. Seemed to have solved this after editing the homctn function (redid the anlge part)
+
 
 -*
 needsPackage "PHCpack";
